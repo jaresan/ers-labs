@@ -3,11 +3,13 @@
  *
  *  Created on: 15. 9. 2013
  *      Author: Tomas Bures <bures@d3s.mff.cuni.cz>
+ *  Modified on: 22.02.2017
+ *      Author: Dominik Skoda <skoda@d3s.mff.cuni.cz>
  */
 
 #include "Button.h"
-#include "stm32f4xx_rcc.h"
-#include "stm32f4xx_conf.h"
+#include "stm32f4xx_hal_rcc.h"
+#include "stm32f4xx_hal_conf.h"
 
 Button::Button(Properties& initProps) : props(initProps) {
 }
@@ -21,41 +23,27 @@ void Button::setPriority(uint8_t irqPreemptionPriority, uint8_t irqSubPriority) 
 }
 
 void Button::init() {
-	GPIO_InitTypeDef gpioInitStruct;
-	EXTI_InitTypeDef EXTI_InitStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
 
 	/* Enable the Button Clock */
-	RCC_AHB1PeriphClockCmd(props.clk, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+	__HAL_RCC_GPIOD_CLK_ENABLE();
 
 	/* Configure Button pin as input */
-	gpioInitStruct.GPIO_Mode = GPIO_Mode_IN;
-	gpioInitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	gpioInitStruct.GPIO_Pin = props.pin;
-	GPIO_Init(props.gpio, &gpioInitStruct);
+	GPIO_InitTypeDef gpioInitStruct;
+	gpioInitStruct.Pin = props.pin;
+	gpioInitStruct.Mode = GPIO_MODE_IT_FALLING;
+	gpioInitStruct.Pull = GPIO_NOPULL;
+	gpioInitStruct.Speed = GPIO_SPEED_HIGH;
 
-	SYSCFG_EXTILineConfig(props.extiPortSource, props.extiPinSource);
+	HAL_GPIO_Init(props.gpio, &gpioInitStruct);
 
-	/* Configure Button EXTI line */
-	EXTI_InitStructure.EXTI_Line = props.extiLine;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
+	HAL_NVIC_SetPriority(props.irqn, irqPreemptionPriority, irqSubPriority);
+	HAL_NVIC_EnableIRQ(props.irqn);
 
-	/* Enable and set Button EXTI Interrupt to the given priority */
-	NVIC_InitStructure.NVIC_IRQChannel = props.irqn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = irqPreemptionPriority;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = irqSubPriority;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-
-	NVIC_Init(&NVIC_InitStructure);
 }
 
 
 bool Button::isPressed() {
-	return GPIO_ReadInputDataBit(props.gpio, props.pin);
+	return HAL_GPIO_ReadPin(props.gpio, props.pin);
 }
 
 void Button::setPressedListener(Listener pressedListener, void* obj) {
@@ -64,7 +52,8 @@ void Button::setPressedListener(Listener pressedListener, void* obj) {
 }
 
 void Button::pressedInterruptHandler() {
-	EXTI_ClearITPendingBit(props.extiLine);
+	// Clear the pending bit
+	__HAL_GPIO_EXTI_CLEAR_IT(props.pin);
 
 	assert_param(pressedListener);
 	pressedListener(pressedListenerObj);
