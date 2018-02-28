@@ -1,138 +1,166 @@
-TARGET:=blink
+# Project (adjust to match your needs)
+PROJECT=blink
+ELF = $(PROJECT).elf
 
+# Library paths (adjust to match your needs)
+STM32F4CUBE=$(ERS_ROOT)/stm32f4cube
+CMSIS=$(STM32F4CUBE)/Drivers/CMSIS
+HAL=$(STM32F4CUBE)/Drivers/STM32F4xx_HAL_Driver
+HAL_BIN=bin
+
+# Tools gcc + binutils + gdb + openocd
 TOOLCHAIN_PREFIX:=arm-none-eabi-
-
-# Optimization level, can be [0, 1, 2, 3, s].
-OPTLVL:=0
-DBG:=-g3
-
-STARTUP:=$(CURDIR)/hardware
-LINKER_SCRIPT:=$(CURDIR)/stm32_flash.ld
-
-TSRC = $(CURDIR)/../src
-
-INCLUDE=-I$(CURDIR)/src
-INCLUDE=-I$(CURDIR)/hardware
-INCLUDE=-I$(TSRC)
-INCLUDE+=-I$(FREERTOS)/include
-INCLUDE+=-I$(FREERTOS)/portable/GCC/ARM_CM4F
-INCLUDE+=-I$(CURDIR)/libraries/CMSIS/Device/ST/STM32F4xx/Include
-INCLUDE+=-I$(CURDIR)/libraries/CMSIS/Include
-INCLUDE+=-I$(CURDIR)/libraries/STM32F4xx_StdPeriph_Driver/inc
-INCLUDE+=-I$(CURDIR)/config
-
-BUILD_DIR = $(CURDIR)/build
-BIN_DIR = $(CURDIR)/binary
-
-# vpath is used so object files are written to the current directory instead
-# of the same directory as their source files
-vpath %.c $(CURDIR)/src $(CURDIR)/libraries/STM32F4xx_StdPeriph_Driver/src \
-	  $(CURDIR)/libraries/syscall $(CURDIR)/hardware
-
-vpath %.s $(STARTUP)
-
-vpath %.cpp $(CURDIR)/src $(TSRC)
-
-# Project Source Files
-SRC+=startup_stm32f4xx.s
-SRC+=stm32f4xx_it.c
-SRC+=system_stm32f4xx.c
-SRC+=syscalls.c
-SRC+=main.cpp
-SRC+=hooks.cpp
-SRC+=LED.cpp
-SRC+=Button.cpp
-
-# Standard Peripheral Source Files
-SRC+=stm32f4xx_syscfg.c
-SRC+=misc.c
-SRC+=stm32f4xx_adc.c
-SRC+=stm32f4xx_dac.c
-SRC+=stm32f4xx_dma.c
-SRC+=stm32f4xx_exti.c
-SRC+=stm32f4xx_flash.c
-SRC+=stm32f4xx_gpio.c
-SRC+=stm32f4xx_i2c.c
-SRC+=stm32f4xx_rcc.c
-SRC+=stm32f4xx_tim.c
-SRC+=stm32f4xx_usart.c
-SRC+=stm32f4xx_rng.c
-
-CDEFS=-DUSE_STDPERIPH_DRIVER
-CDEFS+=-DSTM32F4XX
-CDEFS+=-DHSE_VALUE=8000000
-CDEFS+=-D__FPU_PRESENT=1
-CDEFS+=-D__FPU_USED=1
-CDEFS+=-DARM_MATH_CM4
-
-MCUFLAGS=-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -mthumb-interwork -MMD -MP -mlittle-endian
-COMMONFLAGS=-O$(OPTLVL) $(DBG) -Wall
-CFLAGS=$(COMMONFLAGS) $(MCUFLAGS) $(INCLUDE) $(CDEFS)
-CPPFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti -std=c++11 -fno-use-cxa-atexit 
-#LDFLAGS=$(COMMONFLAGS) $(MCUFLAGS) -fno-exceptions -ffunction-sections -fdata-sections -nostartfiles -Wl,--gc-sections,-T$(LINKER_SCRIPT)
-LDFLAGS=$(COMMONFLAGS) -T$(LINKER_SCRIPT) -Wl,-Map,$(BIN_DIR)/$(TARGET).map $(CPPFLAGS)
-
-
 CC=$(TOOLCHAIN_PREFIX)gcc
-CPP=$(TOOLCHAIN_PREFIX)g++
-LD=$(TOOLCHAIN_PREFIX)g++
+CXX=$(TOOLCHAIN_PREFIX)g++
+LD=$(TOOLCHAIN_PREFIX)ld
 OBJCOPY=$(TOOLCHAIN_PREFIX)objcopy
-OSIZE=$(TOOLCHAIN_PREFIX)size
+SIZE=$(TOOLCHAIN_PREFIX)size
+GDB=/$(TOOLCHAIN_PREFIX)gdb
 AS=$(TOOLCHAIN_PREFIX)as
+OPENOCD=openocd
 
-OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRC))
-OBJ := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(OBJ))
-OBJ := $(patsubst %.s,$(BUILD_DIR)/%.o,$(OBJ))
+# Compiler and linker options
+CFLAGS = -mcpu=cortex-m4 -g -Os -Wall -pipe
+CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -MMD -MP -fsingle-precision-constant
+CFLAGS += -D STM32F407xx
+CXXFLAGS = $(CFLAGS) -std=c++14
+LDFLAGS=-T STM32F407VG_FLASH.ld -specs=nosys.specs -Wl,-Map,$(PROJECT).map
 
-DEP = $(patsubst %.c,$(BUILD_DIR)/%.d,$(SRC))
-DEP := $(patsubst %.cpp,$(BUILD_DIR)/%.d,$(DEP))
-DEP := $(patsubst %.s,,$(DEP))
+# Includes including library includes
+INCLUDES=\
+-I./src \
+-I./config \
+-I$(HAL)/Inc \
+-I$(CMSIS)/Device/ST/STM32F4xx/Include \
+-I$(CMSIS)/Include
+
+# Application objects
+APP_OBJECTS=\
+hardware/stm32f4xx_it.o \
+hardware/system_stm32f4xx.o \
+hardware/startup_stm32f407xx.o \
+hardware/syscalls.o \
+src/main.o \
+src/LED.o \
+src/Button.o
+
+# Currenly used HAL module objects
+HAL_OBJECTS=\
+$(HAL_BIN)/stm32f4xx_hal.o \
+$(HAL_BIN)/stm32f4xx_hal_gpio.o \
+$(HAL_BIN)/stm32f4xx_hal_tim.o \
+$(HAL_BIN)/stm32f4xx_hal_tim_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_rcc.o \
+$(HAL_BIN)/stm32f4xx_hal_rcc_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_dma.o \
+$(HAL_BIN)/stm32f4xx_hal_dma_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_cortex.o \
+\
+$(HAL_BIN)/stm32f4xx_hal_usart.o \
+$(HAL_BIN)/stm32f4xx_hal_uart.o \
+
+# Available HAL module objects
+HAL_OBJECTS_EXTRA=\
+$(HAL_BIN)/stm32f4xx_hal_wwdg.o \
+$(HAL_BIN)/stm32f4xx_ll_fmc.o \
+$(HAL_BIN)/stm32f4xx_ll_fsmc.o \
+$(HAL_BIN)/stm32f4xx_ll_sdmmc.o \
+$(HAL_BIN)/stm32f4xx_ll_usb.o \
+$(HAL_BIN)/stm32f4xx_hal_hash.o \
+$(HAL_BIN)/stm32f4xx_hal_hash_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_hcd.o \
+$(HAL_BIN)/stm32f4xx_hal_i2c.o \
+$(HAL_BIN)/stm32f4xx_hal_i2c_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_i2s.o \
+$(HAL_BIN)/stm32f4xx_hal_i2s_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_irda.o \
+$(HAL_BIN)/stm32f4xx_hal_iwdg.o \
+$(HAL_BIN)/stm32f4xx_hal_lptim.o \
+$(HAL_BIN)/stm32f4xx_hal_ltdc.o \
+$(HAL_BIN)/stm32f4xx_hal_ltdc_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_nand.o \
+$(HAL_BIN)/stm32f4xx_hal_nor.o \
+$(HAL_BIN)/stm32f4xx_hal_pccard.o \
+$(HAL_BIN)/stm32f4xx_hal_pcd.o \
+$(HAL_BIN)/stm32f4xx_hal_pcd_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_pwr.o \
+$(HAL_BIN)/stm32f4xx_hal_pwr_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_qspi.o \
+$(HAL_BIN)/stm32f4xx_hal_rng.o \
+$(HAL_BIN)/stm32f4xx_hal_rtc.o \
+$(HAL_BIN)/stm32f4xx_hal_rtc_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_sai.o \
+$(HAL_BIN)/stm32f4xx_hal_sai_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_sdram.o \
+$(HAL_BIN)/stm32f4xx_hal_smartcard.o \
+$(HAL_BIN)/stm32f4xx_hal_spdifrx.o \
+$(HAL_BIN)/stm32f4xx_hal_spi.o \
+$(HAL_BIN)/stm32f4xx_hal_sram.o \
+$(HAL_BIN)/stm32f4xx_hal_adc.o \
+$(HAL_BIN)/stm32f4xx_hal_adc_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_can.o \
+$(HAL_BIN)/stm32f4xx_hal_cec.o \
+$(HAL_BIN)/stm32f4xx_hal_crc.o \
+$(HAL_BIN)/stm32f4xx_hal_cryp.o \
+$(HAL_BIN)/stm32f4xx_hal_cryp_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_dac.o \
+$(HAL_BIN)/stm32f4xx_hal_dac_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_dcmi.o \
+$(HAL_BIN)/stm32f4xx_hal_dcmi_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_dfsdm.o \
+$(HAL_BIN)/stm32f4xx_hal_dma2d.o \
+$(HAL_BIN)/stm32f4xx_hal_dsi.o \
+$(HAL_BIN)/stm32f4xx_hal_eth.o \
+$(HAL_BIN)/stm32f4xx_hal_flash.o \
+$(HAL_BIN)/stm32f4xx_hal_flash_ex.o \
+$(HAL_BIN)/stm32f4xx_hal_flash_ramfunc.o \
+$(HAL_BIN)/stm32f4xx_hal_fmpi2c.o \
+$(HAL_BIN)/stm32f4xx_hal_fmpi2c_ex.o
 
 
-$(BUILD_DIR)/%.o: %.c
-	@echo [CC] $(notdir $<)
-	$(CC) $(CFLAGS) $< -c -o $@
+OBJECTS=$(APP_OBJECTS) $(HAL_OBJECTS)
 
-$(BUILD_DIR)/%.o: %.cpp
-	@echo [C++] $(notdir $<)
-	$(CPP) $(CPPFLAGS) $< -c -o $@
+DEPENDENCIES=$(OBJECTS:.o=.d)
 
-$(BUILD_DIR)/%.o: %.s
-	@echo [AS] $(notdir $<)
-	$(AS) $< -o $@
-
-$(BUILD_DIR)/%.dep: %.c
-	$(CC) -M $(CFLAGS) "$<" > "$@"
-
-$(BUILD_DIR)/%.dep: %.cpp
-	$(CPP) -M $(CPPFLAGS) "$<" > "$@"
-
-all: $(BIN_DIR)/$(TARGET).elf
-
-$(BIN_DIR)/$(TARGET).elf: $(OBJ)
-	@echo [LD] $(TARGET).elf
-	$(LD) -o $(BIN_DIR)/$(TARGET).elf $(LDFLAGS) $(OBJ) $(LDLIBS)
-	@echo [OBJCOPY] $(TARGET).hex
-	@$(OBJCOPY) -O ihex $(BIN_DIR)/$(TARGET).elf $(BIN_DIR)/$(TARGET).hex
-	@$(OSIZE) --format=berkeley $(BIN_DIR)/$(TARGET).elf
-	
-#	@echo [OBJCOPY] $(TARGET).bin
-#	@$(OBJCOPY) -O binary $(BIN_DIR)/$(TARGET).elf $(BIN_DIR)/$(TARGET).bin
-
-.PHONY: clean
+all: $(ELF)
 
 clean:
-	@echo [RM] OBJ
-	@rm -f $(OBJ) $(patsubst %.o,%.d,$(OBJ))
-	@echo [RM] BIN
-	@rm -f $(BIN_DIR)/$(TARGET).elf
-	@rm -f $(BIN_DIR)/$(TARGET).hex
-	@rm -f $(BIN_DIR)/$(TARGET).bin
-	@rm -f $(BIN_DIR)/$(TARGET).map
+	rm -f $(ELF)
+	rm -f **/*.o
+	rm -f **/*.d
+	rm -f *.map
+	rm -f $(HAL_OBJECTS)
 
-flash: all
-	openocd -s $(ERS_ROOT)/../openocd/scripts -f board/stm32f4discovery.cfg -c "program $(BIN_DIR)/$(TARGET).elf verify reset; exit"
+# Link final efl
+$(ELF): $(APP_OBJECTS) $(HAL_OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
+# Compile C source into object
+$(HAL_BIN)/%.o : $(HAL)/Src/%.c
+	$(CC) -c $(CFLAGS) $(INCLUDES) $< -o $@
+	
+# Compile C source into object
+hardware/%.o : hardware/%.c
+	$(CC) -c $(CFLAGS) $(INCLUDES) $< -o $@
 
+# Compile C++ source into object
+%.o : %.cpp
+	$(CXX) -c $(CXXFLAGS) $(INCLUDES) $< -o $@
 
--include $(DEP)
+# Compile assembler source into object
+%.o : %.s
+	$(CC) -c $(CFLAGS) $(INCLUDES) $< -o $@
+
+# Flash final elf into device
+flash: $(ELF)
+	${OPENOCD} -f board/stm32f4discovery-v2.1.cfg -c "program $< verify reset exit"
+#	${OPENOCD} -f board/stm32f4discovery.cfg -c "program $< verify reset exit"
+
+# Debug
+debug: $(ELF)
+	$(GDB) $(ELF) -ex "target remote | ${OPENOCD} -f board/stm32f4discovery-v2.1.cfg --pipe" -ex load
+#	$(GDB) $(ELF) -ex "target remote | openocd -f board/stm32f4discovery.cfg --pipe" -ex load
+
+-include $(DEPENDENCIES)
+	
+.PHONY: all flash clean debug
