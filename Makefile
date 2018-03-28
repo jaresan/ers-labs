@@ -163,7 +163,7 @@ debug: $(ELF)
 	$(GDB) $(ELF) -ex "target remote | ${OPENOCD} -f board/stm32f4discovery-v2.1.cfg --pipe" -ex load
 
 debug1:
-	$(GDB) $(ELF) -ex "target remote | openocd -f board/stm32f4discovery.cfg --pipe" -ex load
+	$(GDB) $(ELF) -ex "target remote | $(OPENOCD) -f board/stm32f4discovery.cfg --pipe" -ex load
 
 -include $(DEPENDENCIES)
 	
