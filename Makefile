@@ -154,12 +154,16 @@ hardware/%.o : hardware/%.c
 # Flash final elf into device
 flash: $(ELF)
 	${OPENOCD} -f board/stm32f4discovery-v2.1.cfg -c "program $< verify reset exit"
-#	${OPENOCD} -f board/stm32f4discovery.cfg -c "program $< verify reset exit"
+	
+flash1: $(ELF)
+	${OPENOCD} -f board/stm32f4discovery.cfg -c "program $< verify reset exit"
 
 # Debug
 debug: $(ELF)
 	$(GDB) $(ELF) -ex "target remote | ${OPENOCD} -f board/stm32f4discovery-v2.1.cfg --pipe" -ex load
-#	$(GDB) $(ELF) -ex "target remote | openocd -f board/stm32f4discovery.cfg --pipe" -ex load
+
+debug1:
+	$(GDB) $(ELF) -ex "target remote | openocd -f board/stm32f4discovery.cfg --pipe" -ex load
 
 -include $(DEPENDENCIES)
 	
