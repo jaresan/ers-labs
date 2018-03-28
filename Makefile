@@ -160,10 +160,17 @@ flash1: $(ELF)
 
 # Debug
 debug: $(ELF)
-	$(GDB) $(ELF) -ex "target remote | ${OPENOCD} -f board/stm32f4discovery-v2.1.cfg --pipe" -ex load
+	$(GDB) $(ELF) -ex "target remote | $(OPENOCD) -f board/stm32f4discovery-v2.1.cfg --pipe" -ex load
 
 debug1:
 	$(GDB) $(ELF) -ex "target remote | $(OPENOCD) -f board/stm32f4discovery.cfg --pipe" -ex load
+
+# SWO console (output of ITM_SendChar)
+swo: $(ELF)
+	$(OPENOCD) -f board/stm32f4discovery-v2.1.cfg -c "tpiu config internal /dev/stdout uart off 168000000 1680000; init"
+swo1: $(ELF)
+	$(OPENOCD) -f board/stm32f4discovery.cfg -c "tpiu config internal /dev/stdout uart off 168000000 1680000; init"
+
 
 -include $(DEPENDENCIES)
 	

@@ -72,6 +72,7 @@ int main(void)
 	
 	printf("Started.\n");
 	
+	uint32_t cnt = 0;
 	while(1){
 		greenLed.on();
 		redLed.off();
@@ -79,6 +80,7 @@ int main(void)
 		greenLed.off();
 		redLed.on();
 		HAL_Delay(500); // ms
+		printf("Cycle: %d\r\n", cnt++);
 	}
 
 	// Infinite loop
