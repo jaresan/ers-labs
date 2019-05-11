@@ -11,6 +11,7 @@
 #define LED_H_
 
 #include "stm32f4xx_hal.h"
+#include "Button.h"
 
 class LED {
 public:
@@ -28,10 +29,11 @@ private:
 
 class PulseLED {
 public:
-	PulseLED(LED& led, int minimalOnTimeTicks);
+	PulseLED(LED &led, int minimalOnTimeTicks);
 	~PulseLED();
 
 	void pulse();
+	void toggle();
 	void init();
 
 	static void tickInterruptHandler();
@@ -46,6 +48,7 @@ private:
 	static constexpr auto MAX_TICK_LISTENERS = 5; // Maximum number of pulse leds in the system
 	static PulseLED* tickListeners[MAX_TICK_LISTENERS];
 	static int tickListenersNum;
+	bool ledStatus;
 };
 
 #endif /* LED_H_ */

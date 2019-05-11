@@ -8,6 +8,8 @@
  */
 
 #include "LED.h"
+#include <stdio.h>
+#include <cstdint>
 
 LED::LED(uint32_t pin) : pin(pin) {
 }
@@ -46,10 +48,13 @@ void PulseLED::tickInterruptHandler() {
 }
 
 
-PulseLED::PulseLED(LED& led, int minimalOnTimeTicks) : led(led), minimalOnTimeTicks(minimalOnTimeTicks), onTicks(-1) {
+PulseLED::PulseLED(LED &led, int minimalOnTimeTicks)
+        : led(led), minimalOnTimeTicks(minimalOnTimeTicks),
+		  onTicks(-1), ledStatus(false) {
 }
 
 PulseLED::~PulseLED() {
+	ledStatus = false;
 }
 
 void PulseLED::init() {
@@ -60,6 +65,16 @@ void PulseLED::init() {
 void PulseLED::pulse() {
 	onTicks = 0;
 	led.on();
+}
+
+void PulseLED::toggle() {
+	if (ledStatus) {
+		led.off();
+	} else {
+		led.on();
+	}
+
+	ledStatus = !ledStatus;
 }
 
 void PulseLED::tick() {

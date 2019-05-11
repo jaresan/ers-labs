@@ -3,7 +3,7 @@ PROJECT=blink
 ELF = $(PROJECT).elf
 
 # Library paths (adjust to match your needs)
-STM32F4CUBE=$(ERS_ROOT)/stm32f4cube
+STM32F4CUBE=stm32f4cube
 CMSIS=$(STM32F4CUBE)/Drivers/CMSIS
 HAL=$(STM32F4CUBE)/Drivers/STM32F4xx_HAL_Driver
 HAL_BIN=bin
@@ -42,7 +42,8 @@ hardware/startup_stm32f407xx.o \
 hardware/syscalls.o \
 src/main.o \
 src/LED.o \
-src/Button.o
+src/Button.o \
+src/UART.o
 
 # Currenly used HAL module objects
 HAL_OBJECTS=\

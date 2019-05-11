@@ -1,13 +1,17 @@
 #include "main.h"
 #include "LED.h"
 #include "Button.h"
+#include "UART.h"
 
 #include <cstdio>
+#include <cstdint>
 
 
 static void SystemClock_Config(void);
 static void Error_Handler(void);
 
+
+void nextLEDFlash(LED* leds);
 
 Button::Properties userButtonProps {
 	GPIOA, GPIO_PIN_0, EXTI0_IRQn
@@ -18,74 +22,183 @@ LED greenLed(GPIO_PIN_12);
 LED orangeLed(GPIO_PIN_13);
 LED redLed(GPIO_PIN_14);
 LED blueLed(GPIO_PIN_15);
+UART uart;
 
 PulseLED bluePulseLed(blueLed, 1000);
 
+enum LEDMode {
+	All = 0,
+	Clockwise = 1,
+	AntiClockwise = 2
+};
+
+LEDMode ledMode = Clockwise;
+bool allLedsOn = false;
+int ledIndex = 0;
+int lastLedIndex = 0;
 
 void handleInfoButtonInterrupt(void*) {
-	bluePulseLed.pulse();
+	switch (ledMode) {
+		case All:
+			ledMode = Clockwise;
+			break;
+		case Clockwise:
+			ledMode = AntiClockwise;
+			break;
+		case AntiClockwise:
+			ledMode = All;
+			break;
+	}
 }
 
 extern void sysTickHookMain() 
 {
-	static int counter = 0;
-
-	if (counter >= 25) {
-		orangeLed.off();
-	} else {
-		orangeLed.on();
-	}
-
-	counter++;
-
-	if (counter >= 50) {
-		counter = 0;
-	}
+//	static int counter = 0;
+//
+//	if (counter >= 25) {
+//		orangeLed.off();
+//	} else {
+//		orangeLed.on();
+//	}
+//
+//	counter++;
+//
+//	if (counter >= 50) {
+//		counter = 0;
+//	}
 }
+
+
+//int main(void)
+//{
+//	HAL_Init();
+//
+//			__USART2_CLK_ENABLE();
+//			__GPIOA_CLK_ENABLE();
+//
+//	GPIO_InitTypeDef GPIO_InitStructure;
+//
+//	GPIO_InitStructure.Pin = GPIO_PIN_2;
+//	GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
+//	GPIO_InitStructure.Alternate = GPIO_AF7_USART2;
+//	GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+//	GPIO_InitStructure.Pull = GPIO_NOPULL;
+//	HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
+//
+//	GPIO_InitStructure.Pin = GPIO_PIN_3;
+//	GPIO_InitStructure.Mode = GPIO_MODE_AF_OD;
+//	HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
+//
+//	s_UARTHandle.Instance        = USART2;
+//	s_UARTHandle.Init.BaudRate   = 115200;
+//	s_UARTHandle.Init.WordLength = UART_WORDLENGTH_8B;
+//	s_UARTHandle.Init.StopBits   = UART_STOPBITS_1;
+//	s_UARTHandle.Init.Parity     = UART_PARITY_NONE;
+//	s_UARTHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+//	s_UARTHandle.Init.Mode       = UART_MODE_TX_RX;
+//
+//	if (HAL_UART_Init(&s_UARTHandle) != HAL_OK)
+//			asm("bkpt 255");
+//
+//	for (;;)
+//	{
+//		uint8_t buffer[4];
+//		HAL_UART_Receive(&s_UARTHandle, buffer, sizeof(buffer), HAL_MAX_DELAY);
+//		HAL_UART_Transmit(&s_UARTHandle, buffer, sizeof(buffer), HAL_MAX_DELAY);
+//	}
+//}
 
 int main(void)
 {
     /* STM32F4xx HAL library initialization:
 		- Configure the Flash prefetch, Flash preread and Buffer caches
-		- Systick timer is configured by default as source of time base, but user 
-				can eventually implement his proper time base source (a general purpose 
-				timer for example or other time source), keeping in mind that Time base 
-				duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and 
+		- Systick timer is configured by default as source of time base, but user
+				can eventually implement his proper time base source (a general purpose
+				timer for example or other time source), keeping in mind that Time base
+				duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and
 				handled in milliseconds basis.
 		- Low Level Initialization
 	*/
 	HAL_Init();
-	
+
 	// Configure the system clock to 168 MHz
 	SystemClock_Config();
-	
+
 	greenLed.init();
 	orangeLed.init();
 	redLed.init();
 	blueLed.init();
-	
+	uart.init();
+
 	bluePulseLed.init();
-	
+
 	infoButton.setPriority(2,0);
 	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
 	infoButton.init();
-	
+
 	printf("Started.\n");
-	
+
 	uint32_t cnt = 0;
+	LED* leds[4] = {&greenLed, &blueLed, &redLed, &orangeLed};
 	while(1){
-		greenLed.on();
-		redLed.off();
-		HAL_Delay(500); // ms
-		greenLed.off();
-		redLed.on();
-		HAL_Delay(500); // ms
-		printf("Cycle: %d\r\n", cnt++);
+//		nextLEDFlash(*leds);
+//		HAL_Delay(500); // ms/
+        uart.test();
+//		if (cnt % 5 == 0) {
+//			printf("Cycle: %d\n", cnt);
+//		}
+//		cnt++;
 	}
 
 	// Infinite loop
 	while (1) {}
-	
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	printf("Error /shrug \n");
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    printf("TX \n");
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	printf("RX \n");
+}
+
+void nextLEDFlash(LED* leds) {
+	int ledCount = sizeof(leds);
+
+	if (allLedsOn && ledMode != All) {
+		for (int i = 0; i < ledCount; ++i) {
+			leds[i].off();
+		}
+	}
+
+	leds[lastLedIndex].off();
+	leds[ledIndex].on();
+
+	lastLedIndex = ledIndex;
+	if (ledMode == Clockwise) {
+		ledIndex = (ledIndex + 1) % ledCount;
+	} else if (ledMode == AntiClockwise) {
+		ledIndex--;
+		if (ledIndex == -1) ledIndex = 3;
+	} else {
+		if (allLedsOn) {
+			for (int i = 0; i < ledCount; ++i) {
+				leds[i].off();
+			}
+		} else {
+			for (int i = 0; i < ledCount; ++i) {
+				leds[i].on();
+			}
+		}
+		allLedsOn = !allLedsOn;
+	}
 }
 
 /**

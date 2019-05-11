@@ -10,6 +10,8 @@
 #include "Button.h"
 #include "stm32f4xx_hal_rcc.h"
 #include "stm32f4xx_hal_conf.h"
+#include <cstdio>
+#include <cstdint>
 
 Button::Button(Properties& initProps) : props(initProps) {
 }
@@ -25,7 +27,7 @@ void Button::setPriority(uint8_t irqPreemptionPriority, uint8_t irqSubPriority) 
 void Button::init() {
 
 	/* Enable the Button Clock */
-	__HAL_RCC_GPIOD_CLK_ENABLE();
+	__HAL_RCC_GPIOA_CLK_ENABLE();
 
 	/* Configure Button pin as input */
 	GPIO_InitTypeDef gpioInitStruct;
@@ -55,7 +57,10 @@ void Button::pressedInterruptHandler() {
 	// Clear the pending bit
 	__HAL_GPIO_EXTI_CLEAR_IT(props.pin);
 
-	assert_param(pressedListener);
-	pressedListener(pressedListenerObj);
+	if (HAL_GetTick() - lastPressed >= safetyInterval) {
+		assert_param(pressedListener);
+		pressedListener(pressedListenerObj);
+		lastPressed = HAL_GetTick();
+	}
 }
 
