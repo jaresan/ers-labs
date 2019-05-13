@@ -167,7 +167,13 @@ void SysTick_Handler(void)
 
 void EXTI0_IRQHandler(void)
 {
+    printf("BUTTON PRESSED!\n");
 	infoButton.pressedInterruptHandler();
+}
+
+void USART2_IRQHandler(void)
+{
+  printf("USART2 IR handler\n");
 }
 
 /******************************************************************************/

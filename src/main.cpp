@@ -53,60 +53,9 @@ void handleInfoButtonInterrupt(void*) {
 
 extern void sysTickHookMain() 
 {
-//	static int counter = 0;
-//
-//	if (counter >= 25) {
-//		orangeLed.off();
-//	} else {
-//		orangeLed.on();
-//	}
-//
-//	counter++;
-//
-//	if (counter >= 50) {
-//		counter = 0;
-//	}
 }
 
 
-//int main(void)
-//{
-//	HAL_Init();
-//
-//			__USART2_CLK_ENABLE();
-//			__GPIOA_CLK_ENABLE();
-//
-//	GPIO_InitTypeDef GPIO_InitStructure;
-//
-//	GPIO_InitStructure.Pin = GPIO_PIN_2;
-//	GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-//	GPIO_InitStructure.Alternate = GPIO_AF7_USART2;
-//	GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
-//	GPIO_InitStructure.Pull = GPIO_NOPULL;
-//	HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
-//
-//	GPIO_InitStructure.Pin = GPIO_PIN_3;
-//	GPIO_InitStructure.Mode = GPIO_MODE_AF_OD;
-//	HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
-//
-//	s_UARTHandle.Instance        = USART2;
-//	s_UARTHandle.Init.BaudRate   = 115200;
-//	s_UARTHandle.Init.WordLength = UART_WORDLENGTH_8B;
-//	s_UARTHandle.Init.StopBits   = UART_STOPBITS_1;
-//	s_UARTHandle.Init.Parity     = UART_PARITY_NONE;
-//	s_UARTHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
-//	s_UARTHandle.Init.Mode       = UART_MODE_TX_RX;
-//
-//	if (HAL_UART_Init(&s_UARTHandle) != HAL_OK)
-//			asm("bkpt 255");
-//
-//	for (;;)
-//	{
-//		uint8_t buffer[4];
-//		HAL_UART_Receive(&s_UARTHandle, buffer, sizeof(buffer), HAL_MAX_DELAY);
-//		HAL_UART_Transmit(&s_UARTHandle, buffer, sizeof(buffer), HAL_MAX_DELAY);
-//	}
-//}
 
 int main(void)
 {
@@ -124,30 +73,17 @@ int main(void)
 	// Configure the system clock to 168 MHz
 	SystemClock_Config();
 
-	greenLed.init();
-	orangeLed.init();
-	redLed.init();
-	blueLed.init();
+	HAL_Delay(1000); // ms/
 	uart.init();
 
-	bluePulseLed.init();
-
-	infoButton.setPriority(2,0);
-	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
-	infoButton.init();
-
-	printf("Started.\n");
-
-	uint32_t cnt = 0;
-	LED* leds[4] = {&greenLed, &blueLed, &redLed, &orangeLed};
+	int cnt = 0;
 	while(1){
-//		nextLEDFlash(*leds);
-//		HAL_Delay(500); // ms/
+		HAL_Delay(500); // ms/
         uart.test();
-//		if (cnt % 5 == 0) {
-//			printf("Cycle: %d\n", cnt);
-//		}
-//		cnt++;
+		if (cnt % 5 == 0) {
+			printf("Cycle: %d\n", cnt);
+		}
+		cnt++;
 	}
 
 	// Infinite loop

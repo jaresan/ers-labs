@@ -16,15 +16,16 @@ UART::~UART() {
 }
 
 void UART::test() {
-    uint8_t buffer[4];
-    HAL_UART_Receive(&handle, buffer, sizeof(buffer), HAL_MAX_DELAY);
-    printf("Received %s\n", buffer);
-//    uint8_t txBuffer[5] = { buffer[0], buffer[1], buffer[2], buffer[3], 10 };
-    HAL_UART_Transmit(&handle, buffer, sizeof(buffer), HAL_MAX_DELAY);
+    printf("Sending...\n");
+    uint8_t txBuffer[1] = { 'A' };
+    printf("Sent successfuly: %d\n", HAL_UART_Transmit_IT(&handle, txBuffer, sizeof(txBuffer)) == HAL_OK);
 }
 
 void UART::init() {
     __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    HAL_NVIC_EnableIRQ(USART2_IRQn);
+    HAL_NVIC_SetPriority(USART2_IRQn, 2, 1);
 
     GPIO_InitTypeDef GPIO_Init;
     GPIO_Init.Pin = GPIO_PIN_2 | GPIO_PIN_3;
@@ -51,4 +52,6 @@ void UART::init() {
 
     handle = Handle;
     HAL_UART_Init(&handle);
+
+    __HAL_UART_ENABLE_IT(&handle, UART_IT_CTS | UART_IT_LBD | UART_IT_TXE | UART_IT_TC | UART_IT_RXNE | UART_IT_IDLE | UART_IT_PE | UART_IT_ERR);
 }
