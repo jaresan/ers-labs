@@ -8,17 +8,13 @@
 #include <cstdio>
 #include "UART.h"
 
+uint8_t rxBuffer[1];
+UART_HandleTypeDef uartHandle;
 
 UART::UART(){
 }
 
 UART::~UART() {
-}
-
-void UART::test() {
-    printf("Sending...\n");
-    uint8_t txBuffer[1] = { 'A' };
-    printf("Sent successfuly: %d\n", HAL_UART_Transmit_IT(&handle, txBuffer, sizeof(txBuffer)) == HAL_OK);
 }
 
 void UART::init() {
@@ -37,10 +33,9 @@ void UART::init() {
 
     __HAL_RCC_USART2_CLK_ENABLE();
 
-    UART_HandleTypeDef Handle;
     UART_InitTypeDef HandleInit;
 
-    Handle.Instance = USART2;
+    uartHandle.Instance = USART2;
     HandleInit.BaudRate = 115200;
     HandleInit.WordLength = UART_WORDLENGTH_8B;
     HandleInit.StopBits = UART_STOPBITS_1;
@@ -48,10 +43,31 @@ void UART::init() {
     HandleInit.Mode = UART_MODE_TX_RX;
     HandleInit.HwFlowCtl = UART_HWCONTROL_NONE;
     HandleInit.OverSampling = UART_OVERSAMPLING_16;
-    Handle.Init = HandleInit;
+    uartHandle.Init = HandleInit;
 
-    handle = Handle;
-    HAL_UART_Init(&handle);
+    HAL_UART_Init(&uartHandle);
 
-    __HAL_UART_ENABLE_IT(&handle, UART_IT_CTS | UART_IT_LBD | UART_IT_TXE | UART_IT_TC | UART_IT_RXNE | UART_IT_IDLE | UART_IT_PE | UART_IT_ERR);
+//    __HAL_UART_ENABLE_IT(&handle, UART_IT_CTS | UART_IT_LBD | UART_IT_TXE | UART_IT_TC | UART_IT_RXNE | UART_IT_IDLE | UART_IT_PE | UART_IT_ERR);
+}
+
+void UART::startEcho()
+{
+    printf("Connection established: %d \n", HAL_UART_Receive_IT(&uartHandle, rxBuffer, sizeof(rxBuffer)) == HAL_OK);
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    printf("Error /shrug \n");
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    printf("TX \n");
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    // Trasmit back immediately -> echo mode
+    HAL_UART_Transmit(huart, rxBuffer, sizeof(rxBuffer), 0xFFFF);
+    HAL_UART_Receive_IT(huart, rxBuffer, sizeof(rxBuffer));
 }

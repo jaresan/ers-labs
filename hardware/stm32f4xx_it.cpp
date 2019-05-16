@@ -39,6 +39,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "UART.h"
 #include "stm32f4xx_it.h"
 
 #include "LED.h"
@@ -173,7 +174,7 @@ void EXTI0_IRQHandler(void)
 
 void USART2_IRQHandler(void)
 {
-  printf("USART2 IR handler\n");
+    HAL_UART_IRQHandler(&uartHandle);
 }
 
 /******************************************************************************/

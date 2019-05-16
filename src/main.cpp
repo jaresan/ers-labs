@@ -22,9 +22,9 @@ LED greenLed(GPIO_PIN_12);
 LED orangeLed(GPIO_PIN_13);
 LED redLed(GPIO_PIN_14);
 LED blueLed(GPIO_PIN_15);
-UART uart;
 
 PulseLED bluePulseLed(blueLed, 1000);
+UART uart;
 
 enum LEDMode {
 	All = 0,
@@ -73,37 +73,13 @@ int main(void)
 	// Configure the system clock to 168 MHz
 	SystemClock_Config();
 
-	HAL_Delay(1000); // ms/
 	uart.init();
-
-	int cnt = 0;
-	while(1){
-		HAL_Delay(500); // ms/
-        uart.test();
-		if (cnt % 5 == 0) {
-			printf("Cycle: %d\n", cnt);
-		}
-		cnt++;
-	}
+	uart.startEcho();
 
 	// Infinite loop
 	while (1) {}
 }
 
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
-{
-	printf("Error /shrug \n");
-}
-
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-    printf("TX \n");
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	printf("RX \n");
-}
 
 void nextLEDFlash(LED* leds) {
 	int ledCount = sizeof(leds);

@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "UART.h"
 #include "stdio.h"
 #include "stm32f4xx.h"
 
@@ -78,6 +79,7 @@ int _write(int file, char * ptr, int len) {
 	if (!ptr) {
 		return 0;
 	}
+	uint8_t txBuffer[len];
 	for (index = 0; index < len; index++) {
 		
 		ramlog[ramlogIndex] = ptr[index];
@@ -86,8 +88,12 @@ int _write(int file, char * ptr, int len) {
 			ramlogIndex = 0;
 		}
 
-		ITM_SendChar((uint8_t)ptr[index]); // Sends it to ST-Link SWO as well so that it can be observed in ST-Link Utility
+		uint8_t c = (uint8_t)ptr[index];
+		txBuffer[index] = c;
+		ITM_SendChar(c); // Sends it to ST-Link SWO as well so that it can be observed in ST-Link Utility
 	}
+
+	HAL_UART_Transmit(&uartHandle, txBuffer, len, 0xFFFF);
 	return len;
 }
 
