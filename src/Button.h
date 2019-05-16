@@ -41,7 +41,7 @@ private:
 
 	Listener pressedListener;
 	void *pressedListenerObj;
-	u_int32_t safetyInterval = 50;
+	u_int32_t safetyInterval = 500;
 	u_int32_t lastPressed = 0;
 };
 

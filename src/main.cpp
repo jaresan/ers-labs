@@ -38,6 +38,7 @@ int ledIndex = 0;
 int lastLedIndex = 0;
 
 void handleInfoButtonInterrupt(void*) {
+	printf("BUTTON PRESSED!\n");
 	switch (ledMode) {
 		case All:
 			ledMode = Clockwise;
@@ -74,6 +75,9 @@ int main(void)
 	SystemClock_Config();
 
 	uart.init();
+	infoButton.init();
+	infoButton.setPriority(2,0);
+	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
 	uart.startEcho();
 
 	// Infinite loop

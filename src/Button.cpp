@@ -32,7 +32,7 @@ void Button::init() {
 	/* Configure Button pin as input */
 	GPIO_InitTypeDef gpioInitStruct;
 	gpioInitStruct.Pin = props.pin;
-	gpioInitStruct.Mode = GPIO_MODE_IT_FALLING;
+	gpioInitStruct.Mode = GPIO_MODE_IT_RISING;
 	gpioInitStruct.Pull = GPIO_NOPULL;
 	gpioInitStruct.Speed = GPIO_SPEED_HIGH;
 
