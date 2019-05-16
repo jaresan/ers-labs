@@ -13,6 +13,7 @@
 #include "stm32f4xx_hal.h"
 #include "Button.h"
 #include "UART.h"
+#include "LED.h"
 
 extern Button infoButton;
 extern void sysTickHookMain();

@@ -1,10 +1,7 @@
 #include "main.h"
-#include "LED.h"
-#include "Button.h"
-#include "UART.h"
-
 #include <cstdio>
 #include <cstdint>
+#include "stm32f4xx_hal_iwdg.h"
 
 
 static void SystemClock_Config(void);
@@ -25,6 +22,7 @@ LED blueLed(GPIO_PIN_15);
 
 PulseLED bluePulseLed(blueLed, 1000);
 UART uart;
+IWDG_HandleTypeDef watchDogHandle;
 
 enum LEDMode {
 	All = 0,
@@ -39,6 +37,11 @@ int lastLedIndex = 0;
 
 void handleInfoButtonInterrupt(void*) {
 	printf("BUTTON PRESSED!\n");
+
+	// Should reset by watchdog
+	while (true) {
+
+	}
 	switch (ledMode) {
 		case All:
 			ledMode = Clockwise;
@@ -52,11 +55,30 @@ void handleInfoButtonInterrupt(void*) {
 	}
 }
 
-extern void sysTickHookMain() 
+int lastTick = 0;
+extern void sysTickHookMain()
 {
+    if (HAL_GetTick() - lastTick >= 900)
+    {
+        HAL_IWDG_Refresh(&watchDogHandle);
+        lastTick = HAL_GetTick();
+    }
 }
 
 
+void initWatchDog() {
+	IWDG_InitTypeDef init;
+	watchDogHandle.Instance = IWDG;
+
+	// +- resolves to 1s
+	init.Reload = 0x9FF;
+	init.Prescaler = IWDG_PRESCALER_16;
+
+	watchDogHandle.Init = init;
+
+	HAL_IWDG_Init(&watchDogHandle);
+	__HAL_IWDG_START(&watchDogHandle);
+}
 
 int main(void)
 {
@@ -75,10 +97,11 @@ int main(void)
 	SystemClock_Config();
 
 	uart.init();
+    infoButton.setPriority(2, 1);
 	infoButton.init();
-	infoButton.setPriority(2,0);
 	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
 	uart.startEcho();
+	initWatchDog();
 
 	// Infinite loop
 	while (1) {}

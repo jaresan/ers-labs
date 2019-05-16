@@ -40,7 +40,6 @@ void Button::init() {
 
 	HAL_NVIC_SetPriority(props.irqn, irqPreemptionPriority, irqSubPriority);
 	HAL_NVIC_EnableIRQ(props.irqn);
-
 }
 
 

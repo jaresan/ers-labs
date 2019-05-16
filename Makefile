@@ -56,9 +56,9 @@ $(HAL_BIN)/stm32f4xx_hal_rcc_ex.o \
 $(HAL_BIN)/stm32f4xx_hal_dma.o \
 $(HAL_BIN)/stm32f4xx_hal_dma_ex.o \
 $(HAL_BIN)/stm32f4xx_hal_cortex.o \
-\
 $(HAL_BIN)/stm32f4xx_hal_usart.o \
 $(HAL_BIN)/stm32f4xx_hal_uart.o \
+$(HAL_BIN)/stm32f4xx_hal_iwdg.o
 
 # Available HAL module objects
 HAL_OBJECTS_EXTRA=\
