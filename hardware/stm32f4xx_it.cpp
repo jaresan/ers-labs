@@ -57,7 +57,7 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-
+extern TIM_HandleTypeDef    TimHandle;
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -161,7 +161,6 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
     HAL_IncTick();
-	PulseLED::tickInterruptHandler();
 	sysTickHookMain();
 }
 
@@ -173,6 +172,16 @@ void EXTI0_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
     HAL_UART_IRQHandler(&uartHandle);
+}
+
+/**
+  * @brief  This function handles TIM interrupt request.
+  * @param  None
+  * @retval None
+  */
+void TIMx_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&TimHandle);
 }
 
 /******************************************************************************/

@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <cstdint>
 
-LED::LED(uint32_t pin) : pin(pin) {
+LED::LED(uint32_t pin) : pin(pin), ledStatus(false) {
 }
 
 LED::~LED() {
@@ -26,16 +26,26 @@ void LED::init() {
 	GPIO_Init.Pin = pin;
 	GPIO_Init.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_Init.Pull = GPIO_NOPULL;
-	GPIO_Init.Speed = GPIO_SPEED_HIGH;  
+	GPIO_Init.Speed = GPIO_SPEED_HIGH;
 	HAL_GPIO_Init(GPIOD, &GPIO_Init);
 }
 
 void LED::on() {
 	HAL_GPIO_WritePin(GPIOD, pin, GPIO_PIN_SET);
+	ledStatus = true;
+}
+
+void LED::toggle() {
+	if (ledStatus) {
+		this->off();
+	} else {
+		this->on();
+	}
 }
 
 void LED::off() {
 	HAL_GPIO_WritePin(GPIOD, pin, GPIO_PIN_RESET);
+	ledStatus = false;
 }
 
 PulseLED* PulseLED::tickListeners[MAX_TICK_LISTENERS];

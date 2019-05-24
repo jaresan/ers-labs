@@ -20,64 +20,191 @@ LED orangeLed(GPIO_PIN_13);
 LED redLed(GPIO_PIN_14);
 LED blueLed(GPIO_PIN_15);
 
-PulseLED bluePulseLed(blueLed, 1000);
 UART uart;
-IWDG_HandleTypeDef watchDogHandle;
 
-enum LEDMode {
-	All = 0,
-	Clockwise = 1,
-	AntiClockwise = 2
-};
+bool pressRunning = false;
 
-LEDMode ledMode = Clockwise;
-bool allLedsOn = false;
-int ledIndex = 0;
-int lastLedIndex = 0;
+#define TIMx_IRQHandler                TIM3_IRQHandler
+
+uint32_t uwPeriod = 0;
+/* Pulses value */
+uint32_t uwPulse1, uwPulse2 = 0;
+
+/* Timer handler declaration */
+TIM_HandleTypeDef    TimHandle;
+
+/* Timer Output Compare Configuration Structure declaration */
+TIM_OC_InitTypeDef sConfig;
 
 void handleInfoButtonInterrupt(void*) {
 	printf("BUTTON PRESSED!\n");
 
-	// Should reset by watchdog
-	while (true) {
+	if (pressRunning) {
+        if (HAL_TIM_PWM_Stop(&TimHandle, TIM_CHANNEL_1) != HAL_OK) {
+            /* Starting Error */
+            Error_Handler();
+        }
 
+        /* Start channel 2 */
+        if (HAL_TIM_PWM_Stop(&TimHandle, TIM_CHANNEL_2) != HAL_OK) {
+            /* Starting Error */
+            Error_Handler();
+        }
+    } else {
+        /*##-3- Start PWM signals generation #######################################*/
+        /* Start channel 1 */
+        if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK)
+        {
+            /* Starting Error */
+            Error_Handler();
+        }
+
+        /* Start channel 2 */
+        if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_2) != HAL_OK)
+        {
+            /* Starting Error */
+            Error_Handler();
+        }
 	}
-	switch (ledMode) {
-		case All:
-			ledMode = Clockwise;
-			break;
-		case Clockwise:
-			ledMode = AntiClockwise;
-			break;
-		case AntiClockwise:
-			ledMode = All;
-			break;
-	}
+
+    pressRunning = !pressRunning;
 }
 
-int lastTick = 0;
 extern void sysTickHookMain()
 {
-    if (HAL_GetTick() - lastTick >= 900)
-    {
-        HAL_IWDG_Refresh(&watchDogHandle);
-        lastTick = HAL_GetTick();
-    }
 }
 
+void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *htim) {
+    printf("OYE SENOR\n");
+    GPIO_InitTypeDef GPIO_InitStruct;
 
-void initWatchDog() {
-	IWDG_InitTypeDef init;
-	watchDogHandle.Instance = IWDG;
+    /*##-1- Enable peripherals and GPIO Clocks #################################*/
+    /* TIM1 Peripheral clock enable */
+    __HAL_RCC_TIM4_CLK_ENABLE();
 
-	// +- resolves to 1s
-	init.Reload = 0x9FF;
-	init.Prescaler = IWDG_PRESCALER_16;
+    /* Enable GPIO Port Clocks */
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
-	watchDogHandle.Init = init;
+    /*##-2- Configure I/Os #####################################################*/
+    /* Configure PA.8 (TIM1_Channel1), PE.11 (TIM1_Channel2), PA.10 (TIM1_Channel3),
+       PE.14 (TIM1_Channel4), PB.13 (TIM1_Channel1N), PB.14 (TIM1_Channel2N) &
+       PB.15 (TIM1_Channel3N) in output, push-pull, alternate function mode */
 
-	HAL_IWDG_Init(&watchDogHandle);
-	__HAL_IWDG_START(&watchDogHandle);
+    /* Common configuration for all channels */
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
+
+    /* Channel 1 output */
+    GPIO_InitStruct.Pin = GPIO_PIN_7;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    /* Channel 2 complementary output */
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+}
+
+void PWM_INIT()
+{
+    uwPeriod = (SystemCoreClock / 17570 ) - 1;
+
+    //    uwPulse1 = (5 * (uwPeriod - 1)) / 10; -> 50%
+    uwPulse1 = uwPeriod - 1;
+    uwPulse2 = uwPeriod - 1;
+
+    /*##-1- Configure the TIM peripheral #######################################*/
+    /*----------------------------------------------------------------------------
+     Generate 7 PWM signals with 4 different duty cycles:
+     TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2
+      prescaler is different from 1.
+      TIM1CLK = 2 * PCLK2
+      PCLK2 = HCLK / 2
+      => TIM1CLK = 2 * (HCLK / 2) = HCLK = SystemCoreClock
+     TIM1CLK = SystemCoreClock, Prescaler = 0, TIM1 counter clock = SystemCoreClock
+     SystemCoreClock is set to 168 MHz for STM32F4xx devices
+
+     The objective is to generate 7 PWM signal at 17.57 KHz:
+       - TIM1_Period = (SystemCoreClock / 17570) - 1
+     The channel 1 and channel 1N duty cycle is set to 50%
+     The channel 2 and channel 2N duty cycle is set to 37.5%
+     The channel 3 and channel 3N duty cycle is set to 25%
+     The channel 4 duty cycle is set to 12.5%
+     The Timer pulse is calculated as follows:
+       - ChannelxPulse = DutyCycle * (TIM1_Period - 1) / 100
+
+     Note:
+      SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
+      Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
+      function to update SystemCoreClock variable value. Otherwise, any configuration
+      based on this variable will be incorrect.
+    ----------------------------------------------------------------------- */
+
+    /* Initialize TIMx peripheral as follow:
+         + Prescaler = 0
+         + Period = uwPeriod  (to have an output frequency equal to 17.57 KHz)
+         + ClockDivision = 0
+         + Counter direction = Up
+    */
+    TimHandle.Instance = TIM4;
+
+    TimHandle.Init.Period            = uwPeriod;
+    TimHandle.Init.Prescaler         = 0;
+    TimHandle.Init.ClockDivision     = 0;
+    TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
+    TimHandle.Init.RepetitionCounter = 0;
+
+    if(HAL_TIM_PWM_Init(&TimHandle) != HAL_OK)
+    {
+        /* Initialization Error */
+        Error_Handler();
+    }
+
+    /*##-2- Configure the PWM channels #########################################*/
+    /* Common configuration for all channels */
+    sConfig.OCMode      = TIM_OCMODE_PWM2;
+    sConfig.OCFastMode  = TIM_OCFAST_DISABLE;
+    sConfig.OCPolarity  = TIM_OCPOLARITY_LOW;
+    sConfig.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+    sConfig.OCIdleState = TIM_OCIDLESTATE_SET;
+    sConfig.OCNIdleState= TIM_OCNIDLESTATE_RESET;
+
+    /* Set the pulse value for channel 1 */
+    sConfig.Pulse = uwPulse1;
+
+    if(HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, TIM_CHANNEL_1) != HAL_OK)
+    {
+        /* Configuration Error */
+        Error_Handler();
+    }
+
+    /* Set the pulse value for channel 2 */
+    sConfig.Pulse = uwPulse2;
+    if(HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, TIM_CHANNEL_2) != HAL_OK)
+    {
+        /* Configuration Error */
+        Error_Handler();
+    }
+
+    /*##-3- Start PWM signals generation #######################################*/
+    /* Start channel 1 */
+    if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK)
+    {
+        /* Starting Error */
+        Error_Handler();
+    }
+
+    /* Start channel 2 */
+    if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_2) != HAL_OK)
+    {
+        /* Starting Error */
+        Error_Handler();
+    }
+
+    HAL_NVIC_SetPriority(TIM4_IRQn, 3, 0);
+    HAL_NVIC_EnableIRQ(TIM4_IRQn);
+
+    pressRunning = true;
 }
 
 int main(void)
@@ -92,52 +219,31 @@ int main(void)
 		- Low Level Initialization
 	*/
 	HAL_Init();
-
 	// Configure the system clock to 168 MHz
 	SystemClock_Config();
 
 	uart.init();
+	greenLed.init();
+	redLed.init();
+	blueLed.init();
+	orangeLed.init();
     infoButton.setPriority(2, 1);
 	infoButton.init();
 	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
-	uart.startEcho();
-	initWatchDog();
+
+    blueLed.on();
+    PWM_INIT();
+//    TimerInit();
+//	initTimer(500);
 
 	// Infinite loop
 	while (1) {}
 }
 
-
-void nextLEDFlash(LED* leds) {
-	int ledCount = sizeof(leds);
-
-	if (allLedsOn && ledMode != All) {
-		for (int i = 0; i < ledCount; ++i) {
-			leds[i].off();
-		}
-	}
-
-	leds[lastLedIndex].off();
-	leds[ledIndex].on();
-
-	lastLedIndex = ledIndex;
-	if (ledMode == Clockwise) {
-		ledIndex = (ledIndex + 1) % ledCount;
-	} else if (ledMode == AntiClockwise) {
-		ledIndex--;
-		if (ledIndex == -1) ledIndex = 3;
-	} else {
-		if (allLedsOn) {
-			for (int i = 0; i < ledCount; ++i) {
-				leds[i].off();
-			}
-		} else {
-			for (int i = 0; i < ledCount; ++i) {
-				leds[i].on();
-			}
-		}
-		allLedsOn = !allLedsOn;
-	}
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	printf("Period elapsed\n");
+    greenLed.toggle();
 }
 
 /**
@@ -213,6 +319,7 @@ static void SystemClock_Config(void) {
   */
 static void Error_Handler(void) {
 	/* User may add here some code to deal with this error */
+	redLed.on();
 	while(1) {}
 }
 

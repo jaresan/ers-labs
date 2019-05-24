@@ -22,9 +22,11 @@ public:
 	void on();
 	void off();
 	void init();
+	void toggle();
 
 private:
 	uint32_t pin;
+	bool ledStatus;
 };
 
 class PulseLED {

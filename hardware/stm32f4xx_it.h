@@ -46,6 +46,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "UART.h"
 /* Exported types ------------------------------------------------------------*/
+#define TIMx_IRQHandler                TIM3_IRQHandler
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
@@ -61,6 +62,7 @@ void PendSV_Handler(void);
 void SysTick_Handler(void);
 void EXTI0_IRQHandler(void);
 void USART2_IRQHandler(void);
+void TIMx_IRQHandler(void);
 
 #ifdef __cplusplus
 }
