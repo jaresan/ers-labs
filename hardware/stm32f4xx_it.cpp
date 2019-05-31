@@ -169,6 +169,31 @@ void EXTI0_IRQHandler(void)
 	infoButton.pressedInterruptHandler();
 }
 
+void EXTI15_10_IRQHandler(void)
+{
+  // Switch by reading pins to detect proper EXTI port signal
+  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_10)) {
+    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_10);
+    printf("Bottom safe detected.\n");
+  }
+}
+
+void EXTI9_5_IRQHandler(void)
+{
+  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
+    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_7);
+    printf("Left safe detected.\n");
+  }
+  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_8)) {
+    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_8);
+    printf("Rigth safe detected.\n");
+  }
+  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)) {
+    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_9);
+    printf("Top safe detected.\n");
+  }
+}
+
 void USART2_IRQHandler(void)
 {
     HAL_UART_IRQHandler(&uartHandle);

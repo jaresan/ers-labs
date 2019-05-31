@@ -28,7 +28,7 @@ bool pressRunning = false;
 
 uint32_t uwPeriod = 0;
 /* Pulses value */
-uint32_t uwPulse1, uwPulse2 = 0;
+uint32_t xPulse, yPulse = 0;
 
 /* Timer handler declaration */
 TIM_HandleTypeDef    TimHandle;
@@ -37,9 +37,8 @@ TIM_HandleTypeDef    TimHandle;
 TIM_OC_InitTypeDef sConfig;
 
 void handleInfoButtonInterrupt(void*) {
-	printf("BUTTON PRESSED!\n");
-
-	if (pressRunning) {
+    printf("Position: [%d, %d] \n", 1, 0);
+    if (pressRunning) {
         if (HAL_TIM_PWM_Stop(&TimHandle, TIM_CHANNEL_1) != HAL_OK) {
             /* Starting Error */
             Error_Handler();
@@ -51,6 +50,11 @@ void handleInfoButtonInterrupt(void*) {
             Error_Handler();
         }
     } else {
+        if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0) == GPIO_PIN_SET) {
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
+        } else {
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_SET);
+        }
         /*##-3- Start PWM signals generation #######################################*/
         /* Start channel 1 */
         if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK)
@@ -97,55 +101,29 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *htim) {
     GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
 
     /* Channel 1 output */
-    GPIO_InitStruct.Pin = GPIO_PIN_7;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    /* Channel 2 complementary output */
-    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
 void PWM_INIT()
 {
-    uwPeriod = (SystemCoreClock / 17570 ) - 1;
+    // Set PWM dir pins as output
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_Init;
+    GPIO_Init.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+    GPIO_Init.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_Init.Pull = GPIO_NOPULL;
+    GPIO_Init.Speed = GPIO_SPEED_HIGH;
+    HAL_GPIO_Init(GPIOC, &GPIO_Init);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_SET);
+    //
 
-    //    uwPulse1 = (5 * (uwPeriod - 1)) / 10; -> 50%
-    uwPulse1 = uwPeriod - 1;
-    uwPulse2 = uwPeriod - 1;
+    uwPeriod = (SystemCoreClock / 17570) - 1;
 
-    /*##-1- Configure the TIM peripheral #######################################*/
-    /*----------------------------------------------------------------------------
-     Generate 7 PWM signals with 4 different duty cycles:
-     TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2
-      prescaler is different from 1.
-      TIM1CLK = 2 * PCLK2
-      PCLK2 = HCLK / 2
-      => TIM1CLK = 2 * (HCLK / 2) = HCLK = SystemCoreClock
-     TIM1CLK = SystemCoreClock, Prescaler = 0, TIM1 counter clock = SystemCoreClock
-     SystemCoreClock is set to 168 MHz for STM32F4xx devices
+    //    xPulse = uwPeriod / 2  - 1; -> 50%
+    xPulse = uwPeriod - 1;
+    yPulse = uwPeriod - 1;
 
-     The objective is to generate 7 PWM signal at 17.57 KHz:
-       - TIM1_Period = (SystemCoreClock / 17570) - 1
-     The channel 1 and channel 1N duty cycle is set to 50%
-     The channel 2 and channel 2N duty cycle is set to 37.5%
-     The channel 3 and channel 3N duty cycle is set to 25%
-     The channel 4 duty cycle is set to 12.5%
-     The Timer pulse is calculated as follows:
-       - ChannelxPulse = DutyCycle * (TIM1_Period - 1) / 100
-
-     Note:
-      SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
-      Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
-      function to update SystemCoreClock variable value. Otherwise, any configuration
-      based on this variable will be incorrect.
-    ----------------------------------------------------------------------- */
-
-    /* Initialize TIMx peripheral as follow:
-         + Prescaler = 0
-         + Period = uwPeriod  (to have an output frequency equal to 17.57 KHz)
-         + ClockDivision = 0
-         + Counter direction = Up
-    */
     TimHandle.Instance = TIM4;
 
     TimHandle.Init.Period            = uwPeriod;
@@ -153,6 +131,9 @@ void PWM_INIT()
     TimHandle.Init.ClockDivision     = 0;
     TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
     TimHandle.Init.RepetitionCounter = 0;
+
+    HAL_NVIC_SetPriority(TIM4_IRQn, 3, 0);
+    HAL_NVIC_EnableIRQ(TIM4_IRQn);
 
     if(HAL_TIM_PWM_Init(&TimHandle) != HAL_OK)
     {
@@ -170,7 +151,7 @@ void PWM_INIT()
     sConfig.OCNIdleState= TIM_OCNIDLESTATE_RESET;
 
     /* Set the pulse value for channel 1 */
-    sConfig.Pulse = uwPulse1;
+    sConfig.Pulse = xPulse;
 
     if(HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, TIM_CHANNEL_1) != HAL_OK)
     {
@@ -179,7 +160,7 @@ void PWM_INIT()
     }
 
     /* Set the pulse value for channel 2 */
-    sConfig.Pulse = uwPulse2;
+    sConfig.Pulse = yPulse;
     if(HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, TIM_CHANNEL_2) != HAL_OK)
     {
         /* Configuration Error */
@@ -187,22 +168,13 @@ void PWM_INIT()
     }
 
     /*##-3- Start PWM signals generation #######################################*/
-    /* Start channel 1 */
-    if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK)
+    /* Start channel 1 & 2 */
+    if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK ||
+        HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_2) != HAL_OK)
     {
         /* Starting Error */
         Error_Handler();
     }
-
-    /* Start channel 2 */
-    if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_2) != HAL_OK)
-    {
-        /* Starting Error */
-        Error_Handler();
-    }
-
-    HAL_NVIC_SetPriority(TIM4_IRQn, 3, 0);
-    HAL_NVIC_EnableIRQ(TIM4_IRQn);
 
     pressRunning = true;
 }
@@ -232,9 +204,31 @@ int main(void)
 	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
 
     blueLed.on();
+
     PWM_INIT();
-//    TimerInit();
-//	initTimer(500);
+
+
+    // Enable SAFE_B interrupt
+
+    /* Configure Button pin as input */
+    GPIO_InitTypeDef gpioInitStruct;
+    gpioInitStruct.Pin = GPIO_PIN_10;
+    gpioInitStruct.Mode = GPIO_MODE_IT_RISING;
+    gpioInitStruct.Pull = GPIO_NOPULL;
+    gpioInitStruct.Speed = GPIO_SPEED_HIGH;
+
+
+    HAL_GPIO_Init(GPIOC, &gpioInitStruct);
+
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+    gpioInitStruct.Pin = GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9;
+    HAL_GPIO_Init(GPIOC, &gpioInitStruct);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 1);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+    printf("SAFE detection initialized\n");
 
 	// Infinite loop
 	while (1) {}

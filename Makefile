@@ -159,6 +159,8 @@ flash: $(ELF)
 flash1: $(ELF)
 	${OPENOCD} -f board/stm32f4discovery.cfg -c "program $< verify reset exit"
 
+go: flash swo
+
 # Debug
 debug: $(ELF)
 	$(GDB) $(ELF) -ex "target remote | $(OPENOCD) -f board/stm32f4discovery-v2.1.cfg --pipe" -ex load
