@@ -37,7 +37,6 @@ TIM_HandleTypeDef    TimHandle;
 TIM_OC_InitTypeDef sConfig;
 
 void handleInfoButtonInterrupt(void*) {
-    printf("Position: [%d, %d] \n", 1, 0);
     if (pressRunning) {
         if (HAL_TIM_PWM_Stop(&TimHandle, TIM_CHANNEL_1) != HAL_OK) {
             /* Starting Error */
@@ -132,9 +131,6 @@ void PWM_INIT()
     TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
     TimHandle.Init.RepetitionCounter = 0;
 
-    HAL_NVIC_SetPriority(TIM4_IRQn, 3, 0);
-    HAL_NVIC_EnableIRQ(TIM4_IRQn);
-
     if(HAL_TIM_PWM_Init(&TimHandle) != HAL_OK)
     {
         /* Initialization Error */
@@ -205,39 +201,35 @@ int main(void)
 
     blueLed.on();
 
-    PWM_INIT();
-
 
     // Enable SAFE_B interrupt
 
     /* Configure Button pin as input */
     GPIO_InitTypeDef gpioInitStruct;
-    gpioInitStruct.Pin = GPIO_PIN_10;
+    gpioInitStruct.Pin = GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10;
     gpioInitStruct.Mode = GPIO_MODE_IT_RISING;
     gpioInitStruct.Pull = GPIO_NOPULL;
     gpioInitStruct.Speed = GPIO_SPEED_HIGH;
 
-
     HAL_GPIO_Init(GPIOC, &gpioInitStruct);
 
+    gpioInitStruct.Mode = GPIO_MODE_IT_FALLING;
+    gpioInitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_5;
+    HAL_GPIO_Init(GPIOC, &gpioInitStruct);
+    HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 1);
+    HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-    gpioInitStruct.Pin = GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9;
-    HAL_GPIO_Init(GPIOC, &gpioInitStruct);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 1);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
     printf("SAFE detection initialized\n");
 
+    PWM_INIT();
+
 	// Infinite loop
 	while (1) {}
-}
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	printf("Period elapsed\n");
-    greenLed.toggle();
 }
 
 /**

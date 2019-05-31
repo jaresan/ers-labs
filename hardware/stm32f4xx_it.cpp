@@ -164,34 +164,64 @@ void SysTick_Handler(void)
 	sysTickHookMain();
 }
 
+int posX = 10;
+int posY = 10;
+
+// FIXME: Real script starts in a random position -> first detect top & left boundaries
+
 void EXTI0_IRQHandler(void)
 {
 	infoButton.pressedInterruptHandler();
+	printf("pos: [%d, %d] \n", posX, posY);
 }
 
-void EXTI15_10_IRQHandler(void)
+void EXTI3_IRQHandler(void)
 {
-  // Switch by reading pins to detect proper EXTI port signal
-  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_10)) {
-    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_10);
-    printf("Bottom safe detected.\n");
-  }
+    if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_4) == 1) {
+        // FORWARD
+        ++posX;
+    } else {
+        // BACKWARD
+        --posX;
+    }
+    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_3);
 }
 
 void EXTI9_5_IRQHandler(void)
 {
-  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
-    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_7);
-    printf("Left safe detected.\n");
-  }
-  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_8)) {
-    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_8);
-    printf("Rigth safe detected.\n");
-  }
-  if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)) {
-    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_9);
-    printf("Top safe detected.\n");
-  }
+    if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_5)) {
+        if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6) == 1) {
+            // FORWARD
+            ++posY;
+        } else {
+            // BACKWARD
+            --posY;
+        }
+    }
+    if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
+        printf("Left safe detected.\n");
+        posX = 0;
+    }
+    if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_8)) {
+        printf("Right safe detected.\n");
+        posX = 1500;
+    }
+    if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)) {
+        printf("Top safe detected.\n");
+        posY = 0;
+    }
+
+    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_5 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9);
+}
+
+void EXTI15_10_IRQHandler(void)
+{
+    if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_10)) {
+        printf("Bottom safe detected.\n");
+        posY = 1000;
+    }
+
+    __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_10);
 }
 
 void USART2_IRQHandler(void)
@@ -228,7 +258,7 @@ void TIMx_IRQHandler(void)
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
