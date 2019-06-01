@@ -2,6 +2,9 @@
 #include <cstdio>
 #include <cstdint>
 #include "stm32f4xx_hal_iwdg.h"
+#include "MiniPID.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 
 static void SystemClock_Config(void);
@@ -33,42 +36,105 @@ uint32_t xPulse, yPulse = 0;
 /* Timer handler declaration */
 TIM_HandleTypeDef    TimHandle;
 
+int xPosition = 10;
+int yPosition = 10;
+
 /* Timer Output Compare Configuration Structure declaration */
 TIM_OC_InitTypeDef sConfig;
 
-void handleInfoButtonInterrupt(void*) {
-    if (pressRunning) {
-        if (HAL_TIM_PWM_Stop(&TimHandle, TIM_CHANNEL_1) != HAL_OK) {
-            /* Starting Error */
-            Error_Handler();
-        }
 
-        /* Start channel 2 */
-        if (HAL_TIM_PWM_Stop(&TimHandle, TIM_CHANNEL_2) != HAL_OK) {
-            /* Starting Error */
-            Error_Handler();
-        }
+// Best + delay 10
+float kP = 1;
+float kI = 5;
+float kD = 2000;
+
+//float kP = 10;
+//float kI = 0.01;
+//float kD = 1500;
+MiniPID pidY(kP, kI, kD);
+MiniPID pidX(kP, kI, kD);
+
+
+void setSpeed(uint8_t dir, float speed)
+{
+    uint32_t pulse;
+    unsigned int channel;
+    uint16_t pin;
+    bool reset = false;
+
+    if (dir == 0) {
+        channel = TIM_CHANNEL_1;
+        pin = GPIO_PIN_0;
     } else {
-        if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0) == GPIO_PIN_SET) {
-            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_RESET);
-        } else {
-            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1, GPIO_PIN_SET);
-        }
-        /*##-3- Start PWM signals generation #######################################*/
-        /* Start channel 1 */
-        if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK)
-        {
-            /* Starting Error */
-            Error_Handler();
-        }
+        channel = TIM_CHANNEL_2;
+        pin = GPIO_PIN_1;
+    }
 
-        /* Start channel 2 */
-        if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_2) != HAL_OK)
-        {
-            /* Starting Error */
-            Error_Handler();
-        }
-	}
+    if (speed < 0) {
+        reset = true;
+        pulse = uint32_t(uwPeriod + (uwPeriod / 100.0) * speed) - 1;
+    } else {
+        pulse = uint32_t((uwPeriod / 100.0) * speed) - 1;
+    }
+    sConfig.Pulse = pulse;
+    if (reset) {
+        HAL_GPIO_WritePin(GPIOC, pin, GPIO_PIN_RESET);
+    } else {
+        HAL_GPIO_WritePin(GPIOC, pin, GPIO_PIN_SET);
+    }
+
+    HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, channel);
+    HAL_TIM_PWM_Start(&TimHandle, channel);
+//    printf("Speed: %d, Reset: %d, Pulse: %d, max: %d \n", (int)speed, reset, pulse, uwPeriod);
+}
+
+int speed = 0;
+
+int pos[] = {
+        150, 60,
+        170, 60,
+        190, 60,
+        130, 60,
+        210, 100,
+        210, 120,
+        210, 140,
+        210, 80,
+        110, 100,
+        110, 120,
+        110, 140,
+        110, 80,
+        150, 160,
+        170, 160,
+        190, 160,
+        130, 160,
+        10, 50,
+        10, 120,
+        10, 140,
+        10, 80,
+        10, 100,
+        10, 130,
+        10, 200,
+        10, 150,
+        10, 130,
+        10, 200,
+        10, 110,
+        10, 10,
+};
+
+int* posBuff = pos;
+
+int targetX = posBuff[0];
+int targetY = posBuff[1];
+int posIndex = 2;
+
+int lastMode = 1;
+int mode = -1;
+void handleInfoButtonInterrupt(void*) {
+    pidY.reset();
+    pidX.reset();
+    targetX = posBuff[posIndex];
+    targetY = posBuff[posIndex + 1];
+    posIndex += 2;
 
     pressRunning = !pressRunning;
 }
@@ -109,7 +175,7 @@ void PWM_INIT()
     // Set PWM dir pins as output
     __HAL_RCC_GPIOC_CLK_ENABLE();
     GPIO_InitTypeDef GPIO_Init;
-    GPIO_Init.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+    GPIO_Init.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2;
     GPIO_Init.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_Init.Pull = GPIO_NOPULL;
     GPIO_Init.Speed = GPIO_SPEED_HIGH;
@@ -120,8 +186,8 @@ void PWM_INIT()
     uwPeriod = (SystemCoreClock / 17570) - 1;
 
     //    xPulse = uwPeriod / 2  - 1; -> 50%
-    xPulse = uwPeriod - 1;
-    yPulse = uwPeriod - 1;
+    xPulse = 0;
+    yPulse = 0;
 
     TimHandle.Instance = TIM4;
 
@@ -165,17 +231,22 @@ void PWM_INIT()
 
     /*##-3- Start PWM signals generation #######################################*/
     /* Start channel 1 & 2 */
-    if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK ||
-        HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_2) != HAL_OK)
-    {
-        /* Starting Error */
-        Error_Handler();
-    }
+//    if(HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_1) != HAL_OK ||
+//        HAL_TIM_PWM_Start(&TimHandle, TIM_CHANNEL_2) != HAL_OK)
+//    {
+//        /* Starting Error */
+//        Error_Handler();
+//    }
+
+//    HAL_NVIC_SetPriority(TIM4_IRQn, 3, 0);
+//    HAL_NVIC_EnableIRQ(TIM4_IRQn);
+
+    printf("Go!\n");
 
     pressRunning = true;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     /* STM32F4xx HAL library initialization:
 		- Configure the Flash prefetch, Flash preread and Buffer caches
@@ -195,7 +266,7 @@ int main(void)
 	redLed.init();
 	blueLed.init();
 	orangeLed.init();
-    infoButton.setPriority(2, 1);
+    infoButton.setPriority(0, 0);
 	infoButton.init();
 	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
 
@@ -213,23 +284,57 @@ int main(void)
 
     HAL_GPIO_Init(GPIOC, &gpioInitStruct);
 
-    gpioInitStruct.Mode = GPIO_MODE_IT_FALLING;
-    gpioInitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_5;
+    // Configure encoder interrupts
+    gpioInitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+    gpioInitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_6;
     HAL_GPIO_Init(GPIOC, &gpioInitStruct);
-    HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 1);
-    HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
+
+    // Configure interrupt priorities
+    HAL_NVIC_SetPriority(EXTI4_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(EXTI4_IRQn);
     HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-
     printf("SAFE detection initialized\n");
+
+    // Punch & Head_UP
+//    GPIO_InitTypeDef GPIO_Init;
+//    GPIO_Init.Pin = GPIO_PIN_2;
+//    GPIO_Init.Mode = GPIO_MODE_OUTPUT_PP;
+//    GPIO_Init.Pull = GPIO_NOPULL;
+//    GPIO_Init.Speed = GPIO_SPEED_HIGH;
+//    HAL_GPIO_Init(GPIOC, &GPIO_Init);
 
     PWM_INIT();
 
-	// Infinite loop
-	while (1) {}
+
+    setSpeed(0, 100);
+    setSpeed(1, 100);
+
+    //set any other PID configuration options here.
+    pidX.setOutputLimits(-100, 100);
+    pidY.setOutputLimits(-100, 100);
+    while(yPosition > - 15 && yPosition < 1010){
+        //get some sort of sensor value
+        //set some sort of target value
+        int currentX = xPosition - targetX;
+        int currentY = yPosition - targetY;
+//        if (current > 100) {
+//            current =
+//        }
+        int outputX=(int)pidX.getOutput(currentX,0);
+        int outputY=(int)pidY.getOutput(currentY,0);
+        //do something with the output
+        HAL_Delay(10);
+//        printf("Output: %d, y: %d\n", outputY, currentY);
+        setSpeed(0, outputX);
+        setSpeed(1, outputY);
+    }
+
+    while (true) {}
 }
 
 /**

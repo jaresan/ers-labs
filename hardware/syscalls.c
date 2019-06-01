@@ -81,7 +81,6 @@ int _write(int file, char * ptr, int len) {
 	}
 	uint8_t txBuffer[len];
 	for (index = 0; index < len; index++) {
-		
 		ramlog[ramlogIndex] = ptr[index];
 		ramlogIndex++;
 		if (ramlogIndex >= RAMLOG_LENGTH) {
