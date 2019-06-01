@@ -18,5 +18,6 @@
 
 extern Button infoButton;
 extern void sysTickHookMain();
+extern void head_up();
 
 #endif /* MAIN_H_ */

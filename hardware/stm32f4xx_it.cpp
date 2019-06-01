@@ -163,7 +163,7 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
     HAL_IncTick();
-	sysTickHookMain();
+//	sysTickHookMain();
 }
 
 int posX = 10;
@@ -206,15 +206,15 @@ void EXTI9_5_IRQHandler(void)
         }
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_6 | GPIO_PIN_5);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
-        printf("Left safe detected.\n");
+//        printf("Left safe detected.\n");
         posX = 0;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_7);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_8)) {
-        printf("Right safe detected.\n");
+//        printf("Right safe detected.\n");
         posX = 1500;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_8);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)) {
-        printf("Top safe detected.\n");
+//        printf("Top safe detected.\n");
         posY = 0;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_9);
     }
@@ -226,11 +226,15 @@ void EXTI9_5_IRQHandler(void)
 void EXTI15_10_IRQHandler(void)
 {
     if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_10)) {
-        printf("Bottom safe detected.\n");
+//        printf("Bottom safe detected.\n");
         posY = 1000;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_10);
         xPosition = posX;
         yPosition = posY;
+    }
+    if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_11)) {
+        head_up();
+        __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_11);
     }
 }
 

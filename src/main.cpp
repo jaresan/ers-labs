@@ -44,13 +44,11 @@ TIM_OC_InitTypeDef sConfig;
 
 
 // Best + delay 10
-float kP = 1;
-float kI = 5;
-float kD = 2000;
+float kP = 50;
+float kI = 2;
+float kD = 500;
+int delay = 10;
 
-//float kP = 10;
-//float kI = 0.01;
-//float kD = 1500;
 MiniPID pidY(kP, kI, kD);
 MiniPID pidX(kP, kI, kD);
 
@@ -70,7 +68,9 @@ void setSpeed(uint8_t dir, float speed)
         pin = GPIO_PIN_1;
     }
 
-    if (speed < 0) {
+    if (speed == 0) {
+        pulse = 0;
+    } else if (speed < 0) {
         reset = true;
         pulse = uint32_t(uwPeriod + (uwPeriod / 100.0) * speed) - 1;
     } else {
@@ -107,28 +107,24 @@ int pos[] = {
         170, 160,
         190, 160,
         130, 160,
-        10, 50,
         10, 120,
         10, 140,
         10, 80,
         10, 100,
-        10, 130,
         10, 200,
         10, 150,
         10, 130,
-        10, 200,
         10, 110,
-        10, 10,
 };
 
 int* posBuff = pos;
+int posLen = 48;
 
 int targetX = posBuff[0];
 int targetY = posBuff[1];
 int posIndex = 2;
+bool end = false;
 
-int lastMode = 1;
-int mode = -1;
 void handleInfoButtonInterrupt(void*) {
     pidY.reset();
     pidX.reset();
@@ -139,8 +135,37 @@ void handleInfoButtonInterrupt(void*) {
     pressRunning = !pressRunning;
 }
 
-extern void sysTickHookMain()
-{
+void set_new_target() {
+    if (posIndex < posLen) {
+        pidY.reset();
+        pidX.reset();
+        targetX = posBuff[posIndex];
+        targetY = posBuff[posIndex + 1];
+        posIndex += 2;
+    } else {
+        targetX = 0;
+        targetY = 0;
+        end = true;
+    }
+}
+
+bool canMove = false;
+
+void punch_hole() {
+    printf("Punching.. Can I? %d\n", HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_11));
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET);
+    HAL_Delay(20);
+    printf("Resetting..\n");
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
+    set_new_target();
+    HAL_Delay(20);
+}
+
+extern void head_up() {
+    canMove = true;
+}
+
+extern void sysTickHookMain() {
 }
 
 void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *htim) {
@@ -170,8 +195,7 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *htim) {
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
-void PWM_INIT()
-{
+void init_pwm() {
     // Set PWM dir pins as output
     __HAL_RCC_GPIOC_CLK_ENABLE();
     GPIO_InitTypeDef GPIO_Init;
@@ -240,14 +264,10 @@ void PWM_INIT()
 
 //    HAL_NVIC_SetPriority(TIM4_IRQn, 3, 0);
 //    HAL_NVIC_EnableIRQ(TIM4_IRQn);
-
-    printf("Go!\n");
-
     pressRunning = true;
 }
 
-int main(int argc, char *argv[])
-{
+void init_hal_and_leds() {
     /* STM32F4xx HAL library initialization:
 		- Configure the Flash prefetch, Flash preread and Buffer caches
 		- Systick timer is configured by default as source of time base, but user
@@ -257,24 +277,23 @@ int main(int argc, char *argv[])
 				handled in milliseconds basis.
 		- Low Level Initialization
 	*/
-	HAL_Init();
-	// Configure the system clock to 168 MHz
-	SystemClock_Config();
+    HAL_Init();
+    // Configure the system clock to 168 MHz
+    SystemClock_Config();
 
-	uart.init();
-	greenLed.init();
-	redLed.init();
-	blueLed.init();
-	orangeLed.init();
-    infoButton.setPriority(0, 0);
-	infoButton.init();
-	infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
+    uart.init();
+    greenLed.init();
+    redLed.init();
+    blueLed.init();
+    orangeLed.init();
+    infoButton.setPriority(3, 0);
+    infoButton.init();
+    infoButton.setPressedListener(handleInfoButtonInterrupt, nullptr);
 
     blueLed.on();
+}
 
-
-    // Enable SAFE_B interrupt
-
+void init_safety_and_encoders() {
     /* Configure Button pin as input */
     GPIO_InitTypeDef gpioInitStruct;
     gpioInitStruct.Pin = GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10;
@@ -295,46 +314,84 @@ int main(int argc, char *argv[])
     HAL_NVIC_EnableIRQ(EXTI4_IRQn);
     HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
 
-    printf("SAFE detection initialized\n");
+int main(int argc, char *argv[])
+{
+
+    init_hal_and_leds();
+    init_safety_and_encoders();
+    init_pwm();
 
     // Punch & Head_UP
-//    GPIO_InitTypeDef GPIO_Init;
-//    GPIO_Init.Pin = GPIO_PIN_2;
-//    GPIO_Init.Mode = GPIO_MODE_OUTPUT_PP;
-//    GPIO_Init.Pull = GPIO_NOPULL;
-//    GPIO_Init.Speed = GPIO_SPEED_HIGH;
-//    HAL_GPIO_Init(GPIOC, &GPIO_Init);
+    GPIO_InitTypeDef GPIO_Init;
+    GPIO_Init.Pin = GPIO_PIN_2;
+    GPIO_Init.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_Init.Pull = GPIO_NOPULL;
+    GPIO_Init.Speed = GPIO_SPEED_HIGH;
+    HAL_GPIO_Init(GPIOC, &GPIO_Init);
 
-    PWM_INIT();
+    GPIO_Init.Pin = GPIO_PIN_11;
+    GPIO_Init.Mode = GPIO_MODE_IT_RISING;
+    GPIO_Init.Speed = GPIO_SPEED_HIGH;
+    HAL_GPIO_Init(GPIOC, &GPIO_Init);
 
 
-    setSpeed(0, 100);
-    setSpeed(1, 100);
+//    setSpeed(0, 100);
+//    setSpeed(1, 100);
 
     //set any other PID configuration options here.
     pidX.setOutputLimits(-100, 100);
     pidY.setOutputLimits(-100, 100);
-    while(yPosition > - 15 && yPosition < 1010){
-        //get some sort of sensor value
-        //set some sort of target value
+
+
+    int lastX = xPosition;
+    int lastY = yPosition;
+    bool positionChanged = true;
+
+    while (true) {
         int currentX = xPosition - targetX;
         int currentY = yPosition - targetY;
-//        if (current > 100) {
-//            current =
-//        }
-        int outputX=(int)pidX.getOutput(currentX,0);
-        int outputY=(int)pidY.getOutput(currentY,0);
-        //do something with the output
-        HAL_Delay(10);
-//        printf("Output: %d, y: %d\n", outputY, currentY);
-        setSpeed(0, outputX);
-        setSpeed(1, outputY);
-    }
+        uint32_t lastTick = HAL_GetTick();
+        bool shouldPunch = false;
+        while(canMove){
+            uint32_t tick = HAL_GetTick();
+            currentX = xPosition - targetX;
+            currentY = yPosition - targetY;
 
-    while (true) {}
+            int outputX=(int)pidX.getOutput(currentX,0);
+            int outputY=(int)pidY.getOutput(currentY,0);
+
+            if (delay > 0) {
+                HAL_Delay(delay);
+            }
+
+            setSpeed(0, outputX);
+            setSpeed(1, outputY);
+
+            if (lastX != xPosition || lastY != yPosition) {
+                lastTick = tick;
+            }
+
+            if (tick - lastTick > 150) {
+//                printf("Tick: %d, last: %d\n", tick, lastTick);
+                setSpeed(0, 0);
+                setSpeed(1, 0);
+                shouldPunch = !end;
+                break;
+            }
+
+            lastX = xPosition;
+            lastY = yPosition;
+        }
+
+        if (shouldPunch) {
+            canMove = false;
+            punch_hole();
+        }
+    }
 }
 
 /**
