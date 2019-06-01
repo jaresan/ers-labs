@@ -39,11 +39,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "UART.h"
 #include "stm32f4xx_it.h"
-
-#include "LED.h"
-#include "Button.h"
 
 /** @addtogroup STM32F4xx_HAL_Examples
   * @{
@@ -57,7 +53,7 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-extern TIM_HandleTypeDef    TimHandle;
+extern TIM_HandleTypeDef TimHandle;
 extern int xPosition;
 extern int yPosition;
 /* Private function prototypes -----------------------------------------------*/
@@ -72,8 +68,7 @@ extern int yPosition;
   * @param  None
   * @retval None
   */
-void NMI_Handler(void)
-{
+void NMI_Handler(void) {
 }
 
 /**
@@ -81,12 +76,10 @@ void NMI_Handler(void)
   * @param  None
   * @retval None
   */
-void HardFault_Handler(void)
-{
-  /* Go to infinite loop when Hard Fault exception occurs */
-  while (1)
-  {
-  }
+void HardFault_Handler(void) {
+    /* Go to infinite loop when Hard Fault exception occurs */
+    while (1) {
+    }
 }
 
 /**
@@ -94,12 +87,10 @@ void HardFault_Handler(void)
   * @param  None
   * @retval None
   */
-void MemManage_Handler(void)
-{
-  /* Go to infinite loop when Memory Manage exception occurs */
-  while (1)
-  {
-  }
+void MemManage_Handler(void) {
+    /* Go to infinite loop when Memory Manage exception occurs */
+    while (1) {
+    }
 }
 
 /**
@@ -107,12 +98,10 @@ void MemManage_Handler(void)
   * @param  None
   * @retval None
   */
-void BusFault_Handler(void)
-{
-  /* Go to infinite loop when Bus Fault exception occurs */
-  while (1)
-  {
-  }
+void BusFault_Handler(void) {
+    /* Go to infinite loop when Bus Fault exception occurs */
+    while (1) {
+    }
 }
 
 /**
@@ -120,12 +109,10 @@ void BusFault_Handler(void)
   * @param  None
   * @retval None
   */
-void UsageFault_Handler(void)
-{
-  /* Go to infinite loop when Usage Fault exception occurs */
-  while (1)
-  {
-  }
+void UsageFault_Handler(void) {
+    /* Go to infinite loop when Usage Fault exception occurs */
+    while (1) {
+    }
 }
 
 /**
@@ -133,8 +120,7 @@ void UsageFault_Handler(void)
   * @param  None
   * @retval None
   */
-void SVC_Handler(void)
-{
+void SVC_Handler(void) {
 }
 
 /**
@@ -142,8 +128,7 @@ void SVC_Handler(void)
   * @param  None
   * @retval None
   */
-void DebugMon_Handler(void)
-{
+void DebugMon_Handler(void) {
 }
 
 /**
@@ -151,8 +136,7 @@ void DebugMon_Handler(void)
   * @param  None
   * @retval None
   */
-void PendSV_Handler(void)
-{
+void PendSV_Handler(void) {
 }
 
 /**
@@ -160,8 +144,7 @@ void PendSV_Handler(void)
   * @param  None
   * @retval None
   */
-void SysTick_Handler(void)
-{
+void SysTick_Handler(void) {
     HAL_IncTick();
 //	sysTickHookMain();
 }
@@ -173,14 +156,10 @@ bool yFound = false;
 
 // FIXME: Real script starts in a random position -> first detect top & left boundaries
 
-void EXTI0_IRQHandler(void)
-{
-	infoButton.pressedInterruptHandler();
-	printf("pos: [%d, %d] \n", posX, posY);
-}
+void EXTI0_IRQHandler(void) {}
 
-void EXTI4_IRQHandler(void)
-{
+void EXTI4_IRQHandler(void) {
+    // Update x position if [0,y] was already found
     if (xFound) {
         GPIO_PinState pin1 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_4);
         GPIO_PinState pin2 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3);
@@ -196,9 +175,10 @@ void EXTI4_IRQHandler(void)
     __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_4);
 }
 
-void EXTI9_5_IRQHandler(void)
-{
+void EXTI9_5_IRQHandler(void) {
     if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_6)) {
+
+        // Update y position if [x,0] was already found
         if (yFound) {
             GPIO_PinState pin1 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6);
             GPIO_PinState pin2 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_5);
@@ -213,37 +193,39 @@ void EXTI9_5_IRQHandler(void)
         }
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_6 | GPIO_PIN_5);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
-//        printf("Left safe detected.\n");
+        // Left border detected
         posX = 0;
         xPosition = 0;
+        left_border();
         xFound = true;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_7);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_8)) {
-        //printf("Right safe detected.\n");
+        // Right border detected
         posX = 1500;
         xPosition = 1500;
-        left_border();
         xFound = true;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_8);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)) {
-//        printf("Top safe detected.\n");
+        // Top border detected
         posY = 0;
         yPosition = 0;
+        top_border();
         yFound = true;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_9);
     }
 }
 
-void EXTI15_10_IRQHandler(void)
-{
+void EXTI15_10_IRQHandler(void) {
+
+    // Bottom border detected
     if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_10)) {
-//        printf("Bottom safe detected.\n");
         posY = 1000;
         yPosition = 1000;
         yFound = true;
-        top_border();
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_10);
     }
+
+    // Head was raised up
     if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_11)) {
         head_up();
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_11);

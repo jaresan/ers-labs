@@ -42,8 +42,6 @@ hardware/startup_stm32f407xx.o \
 hardware/syscalls.o \
 src/main.o \
 src/LED.o \
-src/Button.o \
-src/UART.o \
 src/PIDController.o
 
 # Currenly used HAL module objects

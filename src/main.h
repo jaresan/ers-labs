@@ -11,13 +11,8 @@
 #define MAIN_H_
 
 #include "stm32f4xx_hal.h"
-#include "Button.h"
-#include "UART.h"
-#include "LED.h"
 #include "PIDController.h"
 
-extern Button infoButton;
-extern void sysTickHookMain();
 extern void head_up();
 extern void left_border();
 extern void top_border();
