@@ -4,23 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "LED.h"
+#include "PWMController.h"
 
 static void SystemClock_Config(void);
 
 static void Error_Handler(void);
 
-uint32_t uwPeriod = 0;
-/* Pulse values */
-uint32_t xPulse, yPulse = 0;
-
-/* Timer handler declaration */
-TIM_HandleTypeDef TimHandle;
-
 int xPosition = -21;
 int yPosition = -21;
-
-/* Timer Output Compare Configuration Structure declaration */
-TIM_OC_InitTypeDef sConfig;
 
 LED redLed(GPIO_PIN_14);
 LED blueLed(GPIO_PIN_15);
@@ -33,39 +24,7 @@ int delay = 10;
 PIDController pidY(kP, kI, kD);
 PIDController pidX(kP, kI, kD);
 
-
-void setSpeed(uint8_t dir, float speed) {
-    uint32_t pulse;
-    unsigned int channel;
-    uint16_t pin;
-    bool reset = false;
-
-    if (dir == 0) {
-        channel = TIM_CHANNEL_1;
-        pin = GPIO_PIN_0;
-    } else {
-        channel = TIM_CHANNEL_2;
-        pin = GPIO_PIN_1;
-    }
-
-    if (speed == 0) {
-        pulse = 0;
-    } else if (speed < 0) {
-        reset = true;
-        pulse = uint32_t(uwPeriod + (uwPeriod / 100.0) * speed) - 1;
-    } else {
-        pulse = uint32_t((uwPeriod / 100.0) * speed) - 1;
-    }
-    sConfig.Pulse = pulse;
-    if (reset) {
-        HAL_GPIO_WritePin(GPIOC, pin, GPIO_PIN_RESET);
-    } else {
-        HAL_GPIO_WritePin(GPIOC, pin, GPIO_PIN_SET);
-    }
-
-    HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, channel);
-    HAL_TIM_PWM_Start(&TimHandle, channel);
-}
+PWMController pwm = PWMController();
 
 int pos[] = {
         150, 60,
@@ -129,76 +88,11 @@ extern void head_up() {
 }
 
 extern void left_border() {
-    setSpeed(0, 50);
+    pwm.setSpeed(0, 50);
 }
 
 extern void top_border() {
-    setSpeed(1, 50);
-}
-
-void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *htim) {
-    __HAL_RCC_TIM4_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-
-    GPIO_InitTypeDef GPIO_InitStruct;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
-
-    /* Channel 1 output */
-    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-}
-
-void init_pwm() {
-    // Set up PWM direction pins
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-    GPIO_InitTypeDef GPIO_Init;
-    GPIO_Init.Pin = GPIO_PIN_0 | GPIO_PIN_1;
-    GPIO_Init.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_Init.Pull = GPIO_NOPULL;
-    GPIO_Init.Speed = GPIO_SPEED_HIGH;
-    HAL_GPIO_Init(GPIOC, &GPIO_Init);
-    //
-
-    uwPeriod = (SystemCoreClock / 17570) - 1;
-
-    //    xPulse = uwPeriod / 2  - 1; -> 50%
-    xPulse = 0;
-    yPulse = 0;
-
-    TimHandle.Instance = TIM4;
-
-    TimHandle.Init.Period = uwPeriod;
-    TimHandle.Init.Prescaler = 0;
-    TimHandle.Init.ClockDivision = 0;
-    TimHandle.Init.CounterMode = TIM_COUNTERMODE_UP;
-    TimHandle.Init.RepetitionCounter = 0;
-
-    if (HAL_TIM_PWM_Init(&TimHandle) != HAL_OK) {
-        Error_Handler();
-    }
-
-    sConfig.OCMode = TIM_OCMODE_PWM2;
-    sConfig.OCFastMode = TIM_OCFAST_DISABLE;
-    sConfig.OCPolarity = TIM_OCPOLARITY_LOW;
-    sConfig.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-    sConfig.OCIdleState = TIM_OCIDLESTATE_SET;
-    sConfig.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-
-    // Pulse for x
-    sConfig.Pulse = xPulse;
-
-    if (HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, TIM_CHANNEL_1) != HAL_OK) {
-        Error_Handler();
-    }
-
-    // Pulse for y
-    sConfig.Pulse = yPulse;
-    if (HAL_TIM_PWM_ConfigChannel(&TimHandle, &sConfig, TIM_CHANNEL_2) != HAL_OK) {
-        Error_Handler();
-    };
+    pwm.setSpeed(1, 50);
 }
 
 void init_hal() {
@@ -261,16 +155,16 @@ void init_puncher() {
 int main(void) {
     init_hal();
     redLed.init();
+    pwm.init();
     init_safety_and_encoders();
-    init_pwm();
     init_puncher();
 
     blueLed.init();
     blueLed.on();
 
     // Go top left to search for 0,0
-    setSpeed(0, -100);
-    setSpeed(1, -100);
+    pwm.setSpeed(0, -100);
+    pwm.setSpeed(1, -100);
 
     // Min/max clamping
     pidX.setOutputRange(-100, 100);
@@ -297,8 +191,8 @@ int main(void) {
                 HAL_Delay(delay);
             }
 
-            setSpeed(0, outputX);
-            setSpeed(1, outputY);
+            pwm.setSpeed(0, outputX);
+            pwm.setSpeed(1, outputY);
 
             if (lastX != xPosition || lastY != yPosition) {
                 lastTick = tick;
@@ -306,8 +200,8 @@ int main(void) {
 
             // If there were no position changes for 100ms the motor isn't moving anymore -> can punch
             if (tick - lastTick > 100) {
-                setSpeed(0, 0);
-                setSpeed(1, 0);
+                pwm.setSpeed(0, 0);
+                pwm.setSpeed(1, 0);
 
                 if (end) {
                     return 1;

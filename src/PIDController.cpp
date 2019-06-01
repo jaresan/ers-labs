@@ -1,3 +1,7 @@
+//
+// Created by Antonín Jareš on 2019-06-01.
+//
+
 #include "PIDController.h"
 
 PIDController::PIDController(double p, double i, double d): kP(p), kI(i), kD(d) {

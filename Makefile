@@ -42,7 +42,8 @@ hardware/startup_stm32f407xx.o \
 hardware/syscalls.o \
 src/main.o \
 src/LED.o \
-src/PIDController.o
+src/PIDController.o \
+src/PWMController.o
 
 # Currenly used HAL module objects
 HAL_OBJECTS=\
