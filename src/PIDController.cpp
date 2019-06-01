@@ -21,8 +21,8 @@ double PIDController::getOutput(double currentValue, double target) {
     double error = target - currentValue;
 
     P = kP * error;
-    D = -kD * (currentValue - lastValue);
     I = kI * errorSum;
+    D = -kD * (currentValue - lastValue);
 
     output = P + I + D;
 

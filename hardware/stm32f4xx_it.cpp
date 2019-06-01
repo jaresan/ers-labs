@@ -154,8 +154,6 @@ int posY;
 bool xFound = false;
 bool yFound = false;
 
-// FIXME: Real script starts in a random position -> first detect top & left boundaries
-
 void EXTI0_IRQHandler(void) {}
 
 void EXTI4_IRQHandler(void) {
