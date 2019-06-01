@@ -27,8 +27,6 @@ UART uart;
 
 bool pressRunning = false;
 
-#define TIMx_IRQHandler                TIM3_IRQHandler
-
 uint32_t uwPeriod = 0;
 /* Pulses value */
 uint32_t xPulse, yPulse = 0;
@@ -36,8 +34,8 @@ uint32_t xPulse, yPulse = 0;
 /* Timer handler declaration */
 TIM_HandleTypeDef    TimHandle;
 
-int xPosition = 10;
-int yPosition = 10;
+int xPosition = -21;
+int yPosition = -21;
 
 /* Timer Output Compare Configuration Structure declaration */
 TIM_OC_InitTypeDef sConfig;
@@ -152,10 +150,10 @@ void set_new_target() {
 bool canMove = false;
 
 void punch_hole() {
-    printf("Punching.. Can I? %d\n", HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_11));
+//    printf("Punching.. Can I? %d\n", HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_11));
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET);
     HAL_Delay(20);
-    printf("Resetting..\n");
+//    printf("Resetting..\n");
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
     set_new_target();
     HAL_Delay(20);
@@ -163,6 +161,14 @@ void punch_hole() {
 
 extern void head_up() {
     canMove = true;
+}
+
+extern void left_border() {
+    setSpeed(0, 50);
+}
+
+extern void top_border() {
+    setSpeed(1, 50);
 }
 
 extern void sysTickHookMain() {
@@ -294,8 +300,9 @@ void init_hal_and_leds() {
 }
 
 void init_safety_and_encoders() {
-    /* Configure Button pin as input */
     GPIO_InitTypeDef gpioInitStruct;
+
+    // Safety borders
     gpioInitStruct.Pin = GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10;
     gpioInitStruct.Mode = GPIO_MODE_IT_RISING;
     gpioInitStruct.Pull = GPIO_NOPULL;
@@ -305,22 +312,21 @@ void init_safety_and_encoders() {
 
     // Configure encoder interrupts
     gpioInitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+    // Enc X and enc Y -> we care only about the border between 10 and 00
     gpioInitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_6;
     HAL_GPIO_Init(GPIOC, &gpioInitStruct);
 
 
     // Configure interrupt priorities
-    HAL_NVIC_SetPriority(EXTI4_IRQn, 1, 0);
+    HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI4_IRQn);
     HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
-int main(int argc, char *argv[])
-{
-
+int main(void) {
     init_hal_and_leds();
     init_safety_and_encoders();
     init_pwm();
@@ -339,13 +345,14 @@ int main(int argc, char *argv[])
     HAL_GPIO_Init(GPIOC, &GPIO_Init);
 
 
-//    setSpeed(0, 100);
-//    setSpeed(1, 100);
+    setSpeed(0, -100);
+    setSpeed(1, -100);
 
-    //set any other PID configuration options here.
+    // Min/max clamping
     pidX.setOutputLimits(-100, 100);
     pidY.setOutputLimits(-100, 100);
 
+    while (xPosition < -20 || yPosition < -20) { HAL_Delay(10); }
 
     int lastX = xPosition;
     int lastY = yPosition;
@@ -375,7 +382,8 @@ int main(int argc, char *argv[])
                 lastTick = tick;
             }
 
-            if (tick - lastTick > 150) {
+            // If there were no position changes for 150ms the motor won't be moving anymore -> can punch
+            if (tick - lastTick > 100) {
 //                printf("Tick: %d, last: %d\n", tick, lastTick);
                 setSpeed(0, 0);
                 setSpeed(1, 0);

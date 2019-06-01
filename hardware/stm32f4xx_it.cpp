@@ -166,8 +166,10 @@ void SysTick_Handler(void)
 //	sysTickHookMain();
 }
 
-int posX = 10;
-int posY = 10;
+int posX;
+int posY;
+bool xFound = false;
+bool yFound = false;
 
 // FIXME: Real script starts in a random position -> first detect top & left boundaries
 
@@ -179,48 +181,57 @@ void EXTI0_IRQHandler(void)
 
 void EXTI4_IRQHandler(void)
 {
-    GPIO_PinState pin1 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_4);
-    GPIO_PinState pin2 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3);
-    if (pin1 == 0 && pin2 == 0) {
-        // FORWARD
-        ++posX;
-    } else if (pin1 == 1 && pin2 == 0) {
-        // BACKWARD
-        --posX;
+    if (xFound) {
+        GPIO_PinState pin1 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_4);
+        GPIO_PinState pin2 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3);
+        if (pin1 == 0 && pin2 == 0) {
+            // FORWARD
+            ++posX;
+        } else if (pin1 == 1 && pin2 == 0) {
+            // BACKWARD
+            --posX;
+        }
+        xPosition = posX;
     }
-    xPosition = posX;
     __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_4);
 }
 
 void EXTI9_5_IRQHandler(void)
 {
     if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_6)) {
-        GPIO_PinState pin1 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6);
-        GPIO_PinState pin2 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_5);
-        if (pin1 == 0 && pin2 == 0) {
-            // FORWARD
-            ++posY;
-        } else if (pin1 == 1 && pin2 == 0) {
-            // BACKWARD
-            --posY;
+        if (yFound) {
+            GPIO_PinState pin1 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6);
+            GPIO_PinState pin2 = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_5);
+            if (pin1 == 0 && pin2 == 0) {
+                // FORWARD
+                ++posY;
+            } else if (pin1 == 1 && pin2 == 0) {
+                // BACKWARD
+                --posY;
+            }
+            yPosition = posY;
         }
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_6 | GPIO_PIN_5);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
 //        printf("Left safe detected.\n");
         posX = 0;
+        xPosition = 0;
+        xFound = true;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_7);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_8)) {
-//        printf("Right safe detected.\n");
+        //printf("Right safe detected.\n");
         posX = 1500;
+        xPosition = 1500;
+        left_border();
+        xFound = true;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_8);
     } else if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)) {
 //        printf("Top safe detected.\n");
         posY = 0;
+        yPosition = 0;
+        yFound = true;
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_9);
     }
-
-    xPosition = posX;
-    yPosition = posY;
 }
 
 void EXTI15_10_IRQHandler(void)
@@ -228,29 +239,15 @@ void EXTI15_10_IRQHandler(void)
     if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_10)) {
 //        printf("Bottom safe detected.\n");
         posY = 1000;
+        yPosition = 1000;
+        yFound = true;
+        top_border();
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_10);
-        xPosition = posX;
-        yPosition = posY;
     }
     if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_11)) {
         head_up();
         __HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_11);
     }
-}
-
-void USART2_IRQHandler(void)
-{
-    HAL_UART_IRQHandler(&uartHandle);
-}
-
-/**
-  * @brief  This function handles TIM interrupt request.
-  * @param  None
-  * @retval None
-  */
-void TIMx_IRQHandler(void)
-{
-  HAL_TIM_IRQHandler(&TimHandle);
 }
 
 /******************************************************************************/

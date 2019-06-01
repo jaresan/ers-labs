@@ -46,7 +46,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "UART.h"
 /* Exported types ------------------------------------------------------------*/
-#define TIMx_IRQHandler                TIM3_IRQHandler
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
@@ -66,7 +65,6 @@ void EXTI4_IRQHandler(void);
 void EXTI9_5_IRQHandler(void);
 void EXTI15_10_IRQHandler(void);
 void USART2_IRQHandler(void);
-void TIMx_IRQHandler(void);
 
 #ifdef __cplusplus
 }
