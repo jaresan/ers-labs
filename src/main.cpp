@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <cstdint>
 #include "stm32f4xx_hal_iwdg.h"
-#include "MiniPID.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -47,8 +46,8 @@ float kI = 2;
 float kD = 500;
 int delay = 10;
 
-MiniPID pidY(kP, kI, kD);
-MiniPID pidX(kP, kI, kD);
+PIDController pidY(kP, kI, kD);
+PIDController pidX(kP, kI, kD);
 
 
 void setSpeed(uint8_t dir, float speed)
@@ -175,7 +174,6 @@ extern void sysTickHookMain() {
 }
 
 void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *htim) {
-    printf("OYE SENOR\n");
     GPIO_InitTypeDef GPIO_InitStruct;
 
     /*##-1- Enable peripherals and GPIO Clocks #################################*/
@@ -186,11 +184,6 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *htim) {
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
     /*##-2- Configure I/Os #####################################################*/
-    /* Configure PA.8 (TIM1_Channel1), PE.11 (TIM1_Channel2), PA.10 (TIM1_Channel3),
-       PE.14 (TIM1_Channel4), PB.13 (TIM1_Channel1N), PB.14 (TIM1_Channel2N) &
-       PB.15 (TIM1_Channel3N) in output, push-pull, alternate function mode */
-
-    /* Common configuration for all channels */
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
@@ -349,14 +342,13 @@ int main(void) {
     setSpeed(1, -100);
 
     // Min/max clamping
-    pidX.setOutputLimits(-100, 100);
-    pidY.setOutputLimits(-100, 100);
+    pidX.setOutputRange(-100, 100);
+    pidY.setOutputRange(-100, 100);
 
     while (xPosition < -20 || yPosition < -20) { HAL_Delay(10); }
 
     int lastX = xPosition;
     int lastY = yPosition;
-    bool positionChanged = true;
 
     while (true) {
         int currentX = xPosition - targetX;

@@ -14,7 +14,7 @@
 #include "Button.h"
 #include "UART.h"
 #include "LED.h"
-#include "MiniPID.h"
+#include "PIDController.h"
 
 extern Button infoButton;
 extern void sysTickHookMain();

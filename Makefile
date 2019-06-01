@@ -44,7 +44,7 @@ src/main.o \
 src/LED.o \
 src/Button.o \
 src/UART.o \
-src/MiniPID.o
+src/PIDController.o
 
 # Currenly used HAL module objects
 HAL_OBJECTS=\
