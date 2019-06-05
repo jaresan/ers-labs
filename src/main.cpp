@@ -169,8 +169,8 @@ int main(void) {
     blueLed.on();
 
     // Go top left to search for 0,0
-    pwm.setSpeed(0, -100);
-    pwm.setSpeed(1, -100);
+    pwm.setSpeed(0, -50);
+    pwm.setSpeed(1, -50);
 
     // Min/max clamping
     pidX.setOutputRange(-100, 100);
